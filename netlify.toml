@@ -1,4 +1,15 @@
-# Temporarily skip builds while the pilot files are assembled.
 [build]
   publish = "."
-  ignore = "exit 0"
+  functions = "netlify/functions"
+  # Skip production builds from main; allow the codex/pilot branch deploy.
+  ignore = "node -e \"process.exit(process.env.BRANCH === 'main' ? 0 : 1)\""
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
