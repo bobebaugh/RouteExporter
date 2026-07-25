@@ -7,7 +7,8 @@
   <meta name="description" content="Combine Google Maps routes into one downloadable KML trip.">
   <title>Route Exporter — Build one trip from many routes</title>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-  <link rel="preconnect" href="https://a.basemaps.cartocdn.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="preconnect" href="https://a.tile-cyclosm.openstreetmap.fr">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -285,12 +286,47 @@
 
     #map {
       z-index: 1;
+      height: 100%;
       min-height: 450px;
       background: #e8e4da;
     }
 
-    .leaflet-tile-pane {
-      filter: sepia(.08) saturate(.88) contrast(.97);
+    .map-wrap {
+      position: relative;
+      min-height: 0;
+    }
+
+    .map-style-toggle {
+      position: absolute;
+      z-index: 500;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 3px;
+      padding: 4px;
+      border: 1px solid rgba(23, 27, 24, .16);
+      border-radius: 9px;
+      background: rgba(244, 239, 228, .94);
+      box-shadow: 0 5px 18px rgba(23, 27, 24, .18);
+    }
+
+    .map-style-toggle button {
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #4f554f;
+      font-size: .75rem;
+      font-weight: 800;
+    }
+
+    .map-style-toggle button:hover {
+      background: rgba(23, 27, 24, .07);
+    }
+
+    .map-style-toggle button.active {
+      background: var(--panel);
+      color: var(--bone);
     }
 
     .leaflet-control-attribution {
@@ -351,7 +387,13 @@
         </div>
         <button class="add" id="addButton" type="submit">Add route</button>
       </form>
-      <div id="map"></div>
+      <div class="map-wrap">
+        <div class="map-style-toggle" role="group" aria-label="Map style">
+          <button class="active" type="button" data-map-style="standard" aria-pressed="true">Standard</button>
+          <button type="button" data-map-style="cyclosm" aria-pressed="false">CyclOSM</button>
+        </div>
+        <div id="map"></div>
+      </div>
     </section>
   </main>
 
@@ -369,11 +411,31 @@
       const status = document.getElementById("status");
 
       const map = L.map("map", { zoomControl: true }).setView([35.5951, -82.5515], 10);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-        maxZoom: 20,
-      }).addTo(map);
+      const tileLayers = {
+        standard: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+          maxZoom: 19,
+        }),
+        cyclosm: L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors | CyclOSM",
+          maxZoom: 20,
+        }),
+      };
+      let currentTileLayer = tileLayers.standard.addTo(map);
       const layerGroup = L.featureGroup().addTo(map);
+
+      document.querySelector(".map-style-toggle").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-map-style]");
+        if (!button || button.classList.contains("active")) return;
+        const style = button.dataset.mapStyle;
+        currentTileLayer.remove();
+        currentTileLayer = tileLayers[style].addTo(map);
+        document.querySelectorAll("[data-map-style]").forEach((option) => {
+          const active = option === button;
+          option.classList.toggle("active", active);
+          option.setAttribute("aria-pressed", String(active));
+        });
+      });
 
       const setStatus = (message = "") => {
         status.textContent = message;
