@@ -286,15 +286,19 @@
     #map {
       z-index: 1;
       min-height: 450px;
-      background: #202722;
+      background: #e8e4da;
+    }
+
+    .leaflet-tile-pane {
+      filter: sepia(.08) saturate(.88) contrast(.97);
     }
 
     .leaflet-control-attribution {
-      background: rgba(23, 27, 24, .8) !important;
-      color: #c8cbc5;
+      background: rgba(244, 239, 228, .88) !important;
+      color: #4f554f;
     }
 
-    .leaflet-control-attribution a { color: #e2a07a; }
+    .leaflet-control-attribution a { color: var(--mesa-dark); }
 
     @media (max-width: 760px) {
       .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(62vh, 1fr); }
@@ -365,7 +369,7 @@
       const status = document.getElementById("status");
 
       const map = L.map("map", { zoomControl: true }).setView([35.5951, -82.5515], 10);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         maxZoom: 20,
       }).addTo(map);
