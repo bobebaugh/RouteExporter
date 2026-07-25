@@ -1,4 +1,4 @@
-# Minimal placeholder so Netlify can connect without deploying main.
+# Temporarily skip builds while the pilot files are assembled.
 [build]
   publish = "."
-  ignore = "node -e \"process.exit(process.env.BRANCH === 'main' ? 0 : 1)\""
+  ignore = "exit 0"
