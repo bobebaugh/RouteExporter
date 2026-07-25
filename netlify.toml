@@ -1,0 +1,4 @@
+# Minimal placeholder so Netlify can connect without deploying main.
+[build]
+  publish = "."
+  ignore = "node -e \"process.exit(process.env.BRANCH === 'main' ? 0 : 1)\""
