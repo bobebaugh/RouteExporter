@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Route Exporter — Google Maps to GPX / KML v1.7</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Sans+3:wght@300;400;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--sand:#E8DCC8;--mesa:#C4703F;--sky:#1B3A4B;--bone:#F5F0E8;--dark:#1A1714;--green:#5CB85C;--red:#D9534F;--magenta:#E040FB}
+  body{font-family:'Source Sans 3',sans-serif;background:var(--dark);color:var(--bone);height:100vh;display:flex;flex-direction:column}
+
+  header{background:linear-gradient(135deg,var(--sky),#0F2233);padding:14px 24px;border-bottom:2px solid var(--mesa);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--sand)}
+  header h1 span{color:var(--mesa)}
+  header .sub{font-size:0.72rem;color:rgba(245,240,232,0.45);text-align:right}
+
+  .input-bar{background:rgba(27,58,75,0.5);padding:10px 24px;display:flex;gap:10px;align-items:center;flex-shrink:0;border-bottom:1px solid rgba(196,112,63,0.2)}
+  .input-bar label{font-size:0.78rem;color:rgba(245,240,232,0.6);white-space:nowrap}
+  .input-bar input{flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(196,112,63,0.3);border-radius:4px;padding:8px 12px;color:var(--bone);font-family:'Source Sans 3',sans-serif;font-size:0.82rem;outline:none;transition:border-color 0.2s}
+  .input-bar input:focus{border-color:var(--mesa)}
+  .input-bar input::placeholder{color:rgba(245,240,232,0.25)}
+
+  .options-bar{background:rgba(27,58,75,0.35);padding:7px 24px;display:flex;align-items:center;gap:18px;flex-shrink:0;border-bottom:1px solid rgba(196,112,63,0.15)}
+  .options-bar .opt-label{font-size:0.72rem;color:rgba(245,240,232,0.4);text-transform:uppercase;letter-spacing:0.06em;margin-right:4px}
+  .opt-group{display:flex;align-items:center;gap:14px}
+  .opt-group label{display:flex;align-items:center;gap:5px;font-size:0.78rem;color:rgba(245,240,232,0.7);cursor:pointer;user-select:none}
+  .opt-group label:hover{color:var(--sand)}
+  .opt-group input[type="checkbox"]{accent-color:var(--mesa);width:14px;height:14px;cursor:pointer}
+  .opt-pip{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
+
+  .toolbar{background:rgba(27,58,75,0.7);padding:8px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid rgba(196,112,63,0.3);flex-wrap:wrap}
+  .status{flex:1;min-width:180px;font-size:0.8rem;color:rgba(245,240,232,0.7)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.idle{background:#666}
+  .dot.loading{background:#F0C040;animation:pulse 1s infinite}
+  .dot.ready{background:var(--green)}
+  .dot.error{background:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+  button{font-family:'Source Sans 3',sans-serif;font-weight:600;font-size:0.78rem;padding:7px 18px;border:none;border-radius:4px;cursor:pointer;text-transform:uppercase;letter-spacing:0.07em;transition:all 0.15s}
+  .btn-go{background:var(--mesa);color:var(--bone)}
+  .btn-go:hover{background:#D4803F}
+  .btn-go:disabled{background:#444;color:#888;cursor:not-allowed}
+  .btn-gpx{background:var(--green);color:#fff}
+  .btn-gpx:hover{background:#4CA84C}
+  .btn-gpx:disabled{background:#444;color:#888;cursor:not-allowed}
+  .btn-kml{background:#5BC0DE;color:#fff}
+  .btn-kml:hover{background:#4AB0CE}
+  .btn-kml:disabled{background:#444;color:#888;cursor:not-allowed}
+  .btn-clear{background:transparent;color:var(--sand);border:1px solid rgba(196,112,63,0.4)}
+  .btn-clear:hover{border-color:var(--mesa);background:rgba(196,112,63,0.1)}
+  .btn-log{background:transparent;color:rgba(245,240,232,0.4);border:1px solid rgba(255,255,255,0.1);font-size:0.7rem;padding:5px 10px}
+
+  .stops-bar{background:rgba(26,23,20,0.6);padding:7px 24px;font-size:0.75rem;color:rgba(245,240,232,0.5);border-bottom:1px solid rgba(196,112,63,0.1);flex-shrink:0;min-height:28px;overflow-x:auto;white-space:nowrap}
+  .stops-bar strong{color:var(--mesa)}
+  .stops-bar .empty{font-style:italic;color:rgba(245,240,232,0.25)}
+
+  #map{flex:1;z-index:1}
+
+  .info-box{position:absolute;bottom:20px;left:20px;background:rgba(26,23,20,0.92);backdrop-filter:blur(12px);border:1px solid rgba(196,112,63,0.4);border-radius:8px;padding:14px 18px;z-index:1000;max-width:360px;font-size:0.8rem;line-height:1.5;display:none}
+  .info-box h3{font-family:'Playfair Display',serif;color:var(--sand);margin-bottom:6px;font-size:0.95rem}
+  .info-box .s{color:var(--mesa);font-weight:600}
+  .seg-list{margin-top:6px;font-size:0.72rem;color:rgba(245,240,232,0.5);max-height:150px;overflow-y:auto}
+  .seg-list div{padding:1px 0}
+
+  .log{background:#0a0a0a;color:#8f8;font-family:'Courier New',monospace;font-size:0.7rem;padding:8px 24px;max-height:120px;overflow-y:auto;flex-shrink:0;border-top:1px solid #333;display:none;line-height:1.4}
+
+  .leaflet-popup-content-wrapper{background:rgba(26,23,20,0.95)!important;color:var(--bone)!important;border:1px solid rgba(196,112,63,0.5)!important;border-radius:6px!important;font-family:'Source Sans 3',sans-serif!important}
+  .leaflet-popup-tip{background:rgba(26,23,20,0.95)!important}
+  .leaflet-popup-content{margin:8px 12px!important;font-size:0.82rem!important}
+  .popup-title{font-family:'Playfair Display',serif;color:var(--sand);font-size:0.95rem;margin-bottom:2px}
+  .popup-sub{color:rgba(245,240,232,0.5);font-size:0.72rem}
+
+  .parse-error{background:rgba(217,83,79,0.15);border:1px solid rgba(217,83,79,0.4);border-radius:6px;padding:10px 16px;margin:8px 24px;font-size:0.8rem;color:#E8A0A0;display:none;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Google Maps <span>&rarr;</span> GPX <span>/</span> KML <span>v1.7</span></h1>
+  <div class="sub">Paste a Google Maps directions link<br>Get a GPX or KML file with real road geometry</div>
+</header>
+
+<div class="input-bar">
+  <label>Google Maps URL:</label>
+  <input type="text" id="urlInput" placeholder="Paste a Google Maps directions URL here and press Enter..." spellcheck="false">
+  <button class="btn-go" id="btnParse" onclick="parseAndFetch()">Fetch Route</button>
+</div>
+
+<div class="parse-error" id="parseError"></div>
+
+<div class="options-bar">
+  <span class="opt-label">Export layers:</span>
+  <div class="opt-group">
+    <label><input type="checkbox" id="layerRoute" checked> <span class="opt-pip" style="background:#C4703F;"></span> Route line</label>
+    <label><input type="checkbox" id="layerStart" checked> <span class="opt-pip" style="background:#5CB85C;"></span> Start pin</label>
+    <label><input type="checkbox" id="layerMid" checked> <span class="opt-pip" style="background:#E040FB;"></span> Via pins</label>
+    <label><input type="checkbox" id="layerShape" checked> <span class="opt-pip" style="background:#F0C040;border:1px solid #C4703F;"></span> Shape pins</label>
+    <label><input type="checkbox" id="layerEnd" checked> <span class="opt-pip" style="background:#D9534F;"></span> End pin</label>
+  </div>
+</div>
+
+<div class="stops-bar" id="stopsBar">
+  <span class="empty">No route loaded &mdash; paste a Google Maps directions URL above</span>
+</div>
+
+<div class="toolbar">
+  <div class="status">
+    <span class="dot idle" id="dot"></span>
+    <span id="statusText">Waiting for URL...</span>
+  </div>
+  <button class="btn-gpx" id="btnGpx" onclick="downloadGPX()" disabled>Download GPX</button>
+  <button class="btn-kml" id="btnKml" onclick="downloadKML()" disabled>Download KML</button>
+  <button class="btn-clear" onclick="clearRoute()">Clear</button>
+  <button class="btn-log" onclick="toggleLog()">Log</button>
+</div>
+
+<div id="map"></div>
+
+<div class="info-box" id="info">
+  <h3 id="routeTitle">Route Summary</h3>
+  <div><span class="s" id="distVal">&mdash;</span> miles &nbsp; <span class="s" id="timeVal">&mdash;</span> drive time &nbsp; <span style="color:rgba(245,240,232,0.4);font-size:0.72rem" id="ptCount"></span></div>
+  <div class="seg-list" id="segDetails"></div>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+// =============================================================
+// STATE
+// =============================================================
+var stops = [];
+var shapingPoints = [];
+var allWaypoints = [];
+var routeCoords = [];
+var segmentData = [];
+var routeLayers = [];
+var markerLayers = [];
+
+// Helper: build XML name tag (using variable to avoid HTML parser issues)
+var NAME_OPEN = '<' + 'name' + '>';
+var NAME_CLOSE = '</' + 'name' + '>';
+function nameTag(text) { return NAME_OPEN + esc(text) + NAME_CLOSE; }
+
+// =============================================================
+// HELPERS
+// =============================================================
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function getLayers() {
+  return {
+    route: document.getElementById('layerRoute').checked,
+    start: document.getElementById('layerStart').checked,
+    mid:   document.getElementById('layerMid').checked,
+    shape: document.getElementById('layerShape').checked,
+    end:   document.getElementById('layerEnd').checked
+  };
+}
+function safeName(s) {
+  return s.replace(/[^a-zA-Z0-9 ]/g,'').trim().replace(/\s+/g,'_').substring(0,25);
+}
+
+// =============================================================
+// MAP
+// =============================================================
+var map = L.map('map', { center:[32,-99], zoom:5 });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains:'abcd',
+  maxZoom:19
+}).addTo(map);
+
+// =============================================================
+// LOGGING
+// =============================================================
+function log(msg) {
+  var el = document.getElementById('log');
+  var t = new Date().toLocaleTimeString();
+  el.innerHTML += '[' + t + '] ' + msg + '\n';
+  el.scrollTop = el.scrollHeight;
+  console.log(msg);
+}
+function toggleLog() {
+  var el = document.getElementById('log');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// =============================================================
+// PARSE GOOGLE MAPS URL
+// =============================================================
+function parseGoogleMapsURL(url) {
+  url = url.trim();
+  log('Parsing: ' + url.substring(0, 120) + (url.length > 120 ? '...' : ''));
+
+  if (url.indexOf('google.com/maps') < 0 && url.indexOf('goo.gl') < 0 && url.indexOf('maps.app.goo') < 0) {
+    throw new Error('Not a Google Maps URL. Paste a directions link from Google Maps.');
+  }
+
+  var coords = [];
+  var dataMatch = url.match(/data=([^&]*)/);
+  if (dataMatch) {
+    var dataStr = decodeURIComponent(dataMatch[1]);
+
+    // Single pass — captures named stops (!2m2) and shaping points (!1m2) in route order
+    var combinedRegex = /!(2m2|1m2)!1d(-?[\d.]+)!2d(-?[\d.]+)/g;
+    var m;
+    allWaypoints = [];
+    shapingPoints = [];
+    var shapeNum = 1;
+    while ((m = combinedRegex.exec(dataStr)) !== null) {
+      var isStop = (m[1] === '2m2');
+      var pt = { type: isStop ? 'stop' : 'shape', lon: parseFloat(m[2]), lat: parseFloat(m[3]) };
+      allWaypoints.push(pt);
+      if (isStop) {
+        coords.push({ lon: pt.lon, lat: pt.lat });
+      } else {
+        pt.name = 'Shape-' + shapeNum++;
+        shapingPoints.push(pt);
+      }
+    }
+    log('  Coordinates found: ' + coords.length + '  Shaping points: ' + shapingPoints.length);
+  }
+
+  var names = [];
+  var dirMatch = url.match(/\/dir\/([^?]*)/);
+  if (dirMatch) {
+    var parts = dirMatch[1].split('/').filter(function(s) { return s && s.charAt(0) !== '@' && s.indexOf('data=') !== 0; });
+    parts.forEach(function(s) { names.push(decodeURIComponent(s.replace(/\+/g, ' '))); });
+    log('  Place names found: ' + names.length);
+  }
+
+  if (coords.length === 0) {
+    throw new Error('No coordinates found. Make sure the URL is a full directions link (contains /dir/ and data= with coordinates).');
+  }
+
+  var parsed = [];
+  for (var i = 0; i < coords.length; i++) {
+    var nm = names[i] || ('Waypoint ' + (i + 1));
+    if (nm.length > 60) nm = nm.substring(0, 57) + '...';
+    parsed.push({ name: nm, lat: coords[i].lat, lon: coords[i].lon });
+    log('  Stop ' + (i+1) + ': "' + nm + '" (' + coords[i].lat.toFixed(5) + ', ' + coords[i].lon.toFixed(5) + ')');
+  }
+
+  if (parsed.length < 2) {
+    throw new Error('Need at least 2 stops. Found ' + parsed.length + '. Is this a directions URL?');
+  }
+
+  for (var j = 0; j < parsed.length; j++) {
+    if (Math.abs(parsed[j].lat) > 90 || Math.abs(parsed[j].lon) > 180) {
+      throw new Error('Bad coordinates for "' + parsed[j].name + '": ' + parsed[j].lat + ', ' + parsed[j].lon);
+    }
+  }
+
+  return parsed;
+}
+
+// =============================================================
+// CLEAR
+// =============================================================
+function clearRoute() {
+  routeLayers.forEach(function(l) { map.removeLayer(l); });
+  markerLayers.forEach(function(l) { map.removeLayer(l); });
+  routeLayers = [];
+  markerLayers = [];
+  stops = [];
+  shapingPoints = [];
+  allWaypoints = [];
+  routeCoords = [];
+  segmentData = [];
+
+  document.getElementById('stopsBar').innerHTML = '<span class="empty">No route loaded</span>';
+  document.getElementById('info').style.display = 'none';
+  document.getElementById('dot').className = 'dot idle';
+  document.getElementById('statusText').textContent = 'Cleared. Paste a new URL.';
+  document.getElementById('btnGpx').disabled = true;
+  document.getElementById('btnKml').disabled = true;
+  document.getElementById('parseError').style.display = 'none';
+  document.getElementById('urlInput').value = '';
+  document.getElementById('urlInput').focus();
+  map.setView([32, -99], 5);
+  log('--- Route cleared ---');
+}
+
+// =============================================================
+// MAIN: PARSE + FETCH
+// =============================================================
+async function parseAndFetch() {
+  var url = document.getElementById('urlInput').value;
+  var errBox = document.getElementById('parseError');
+  errBox.style.display = 'none';
+
+  if (!url.trim()) {
+    errBox.textContent = 'Paste a Google Maps directions URL first.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  routeLayers.forEach(function(l) { map.removeLayer(l); });
+  markerLayers.forEach(function(l) { map.removeLayer(l); });
+  routeLayers = [];
+  markerLayers = [];
+  routeCoords = [];
+  segmentData = [];
+  document.getElementById('info').style.display = 'none';
+  document.getElementById('btnGpx').disabled = true;
+  document.getElementById('btnKml').disabled = true;
+
+  try {
+    stops = parseGoogleMapsURL(url);
+  } catch (e) {
+    errBox.textContent = e.message;
+    errBox.style.display = 'block';
+    log('Parse error: ' + e.message);
+    return;
+  }
+
+  document.getElementById('stopsBar').innerHTML = stops.map(function(s, i) {
+    return '<strong>' + (i+1) + '</strong> ' + s.name + (i < stops.length - 1 ? ' &rarr; ' : '');
+  }).join('');
+
+  stops.forEach(function(s, i) {
+    var isEnd = (i === 0 || i === stops.length - 1);
+    var sz = isEnd ? 14 : 10;
+    var clr = i === 0 ? '#5CB85C' : i === stops.length - 1 ? '#D9534F' : '#E040FB';
+    var bdr = isEnd ? '2px solid #fff' : '2px solid #fff';
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+clr+';border:'+bdr+';box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>',
+      iconSize: [sz, sz], iconAnchor: [sz/2, sz/2]
+    });
+    var m = L.marker([s.lat, s.lon], { icon: icon }).addTo(map);
+    m.bindPopup('<div class="popup-title">'+s.name+'</div><div class="popup-sub">Stop '+(i+1)+' of '+stops.length+'<br>'+s.lat.toFixed(5)+', '+s.lon.toFixed(5)+'</div>');
+    markerLayers.push(m);
+  });
+
+  // Shaping point markers — small, subtle, pale yellow
+  shapingPoints.forEach(function(s, i) {
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="width:7px;height:7px;border-radius:50%;background:#F0C040;border:1px solid #C4703F;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+      iconSize: [7, 7], iconAnchor: [3.5, 3.5]
+    });
+    var m = L.marker([s.lat, s.lon], { icon: icon }).addTo(map);
+    m.bindPopup('<div class="popup-title">'+s.name+'</div><div class="popup-sub">Route shaping point<br>'+s.lat.toFixed(5)+', '+s.lon.toFixed(5)+'</div>');
+    markerLayers.push(m);
+  });
+
+  map.fitBounds(L.latLngBounds(stops.map(function(s) { return [s.lat, s.lon]; })), { padding: [50, 50] });
+  await fetchOSRM();
+}
+
+// =============================================================
+// OSRM FETCH
+// =============================================================
+async function fetchOSRM() {
+  var dot = document.getElementById('dot');
+  var statusText = document.getElementById('statusText');
+  var btnParse = document.getElementById('btnParse');
+
+  btnParse.disabled = true;
+  dot.className = 'dot loading';
+
+  // Build two coordinate strings: full (named stops + shaping points) and fallback (named stops only)
+  var coordStrFull = allWaypoints.map(function(w) { return w.lon + ',' + w.lat; }).join(';');
+  var coordStrStops = stops.map(function(s) { return s.lon + ',' + s.lat; }).join(';');
+  var usedShaping = false;
+
+  // Try full waypoints first if there are shaping points, otherwise go straight to stops-only
+  var coordStrings = (shapingPoints.length > 0 && coordStrFull !== coordStrStops)
+    ? [coordStrFull, coordStrStops]
+    : [coordStrStops];
+
+  var osrmHosts = [
+    'https://routing.openstreetmap.de/routed-car/route/v1/driving/',
+    'https://router.project-osrm.org/route/v1/driving/'
+  ];
+
+  var data = null;
+  var attemptedFull = false;
+
+  outer:
+  for (var ci = 0; ci < coordStrings.length; ci++) {
+    var cStr = coordStrings[ci];
+    var isFull = (ci === 0 && shapingPoints.length > 0 && cStr === coordStrFull);
+    for (var ei = 0; ei < osrmHosts.length; ei++) {
+      var ep = osrmHosts[ei] + cStr + '?overview=full&geometries=geojson&steps=true';
+      var host = osrmHosts[ei].split('//')[1].split('/')[0];
+      try {
+        var label = isFull ? host + ' (with shaping pts)' : host + ' (stops only)';
+        log('OSRM request -> ' + label);
+        statusText.textContent = 'Routing via ' + host + (isFull ? ' (full waypoints)' : '') + '...';
+        var resp = await fetch(ep, { signal: AbortSignal.timeout(20000) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        data = await resp.json();
+        if (data.code === 'Ok' && data.routes && data.routes.length) {
+          usedShaping = isFull;
+          log('OK: ' + label);
+          break outer;
+        }
+        log(host + ': code=' + data.code);
+        data = null;
+      } catch (e) {
+        log('FAIL ' + host + ': ' + e.message);
+        data = null;
+      }
+    }
+    if (isFull) log('Shaping point routing failed — retrying with named stops only...');
+  }
+
+  if (!data) {
+    dot.className = 'dot error';
+    statusText.textContent = 'Routing failed. Check your internet and try again.';
+    btnParse.disabled = false;
+    return;
+  }
+
+  var route = data.routes[0];
+  routeCoords = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+  log('Route geometry: ' + routeCoords.length + ' points');
+
+  segmentData = [];
+  if (route.legs) {
+    if (usedShaping && shapingPoints.length > 0) {
+      // Aggregate legs between named stops — shaping points add extra legs in between
+      var stopIndices = [];
+      allWaypoints.forEach(function(w, i) { if (w.type === 'stop') stopIndices.push(i); });
+      for (var si = 0; si < stopIndices.length - 1; si++) {
+        var fromIdx = stopIndices[si];
+        var toIdx = stopIndices[si + 1];
+        var totalDist = 0, totalDur = 0;
+        for (var li = fromIdx; li < toIdx; li++) {
+          totalDist += route.legs[li].distance;
+          totalDur += route.legs[li].duration;
+        }
+        segmentData.push({
+          from: stops[si].name, to: stops[si + 1].name,
+          miles: (totalDist / 1609.34).toFixed(1),
+          minutes: Math.round(totalDur / 60)
+        });
+      }
+    } else {
+      route.legs.forEach(function(leg, i) {
+        segmentData.push({
+          from: stops[i].name, to: stops[i + 1].name,
+          miles: (leg.distance / 1609.34).toFixed(1),
+          minutes: Math.round(leg.duration / 60)
+        });
+      });
+    }
+  }
+
+  var glow = L.polyline(routeCoords, { color:'#F0C040', weight:8, opacity:0.15, smoothFactor:1 }).addTo(map);
+  var line = L.polyline(routeCoords, { color:'#C4703F', weight:4, opacity:0.9, smoothFactor:1 }).addTo(map);
+  routeLayers.push(glow, line);
+  map.fitBounds(line.getBounds(), { padding:[50,50] });
+
+  var totalMi = (route.distance / 1609.34).toFixed(0);
+  var h = Math.floor(route.duration / 3600);
+  var mn = Math.floor((route.duration % 3600) / 60);
+
+  document.getElementById('routeTitle').textContent = stops[0].name + ' -> ' + stops[stops.length-1].name;
+  document.getElementById('distVal').textContent = totalMi;
+  document.getElementById('timeVal').textContent = h + 'h ' + mn + 'm';
+  document.getElementById('ptCount').textContent = '(' + routeCoords.length.toLocaleString() + ' pts)';
+  document.getElementById('segDetails').innerHTML = segmentData.map(function(s, i) {
+    return '<div><strong style="color:var(--mesa)">' + (i+1) + '.</strong> ' + s.from + ' &rarr; ' + s.to + ': ' + s.miles + ' mi (' + s.minutes + ' min)</div>';
+  }).join('');
+  document.getElementById('info').style.display = 'block';
+
+  dot.className = 'dot ready';
+  var shapingNote = usedShaping ? ' (route via shaping points)' : (shapingPoints.length > 0 ? ' (stops only — shaping pts in export)' : '');
+  statusText.textContent = 'Route loaded — ' + routeCoords.length.toLocaleString() + ' trackpoints. Ready to download.' + shapingNote;
+  document.getElementById('btnGpx').disabled = false;
+  document.getElementById('btnKml').disabled = false;
+  btnParse.disabled = false;
+  log('Route complete. GPX/KML ready.');
+}
+
+// =============================================================
+// GPX DOWNLOAD
+// =============================================================
+function downloadGPX() {
+  if (!routeCoords.length || !stops.length) return;
+  var lay = getLayers();
+
+  var filename = safeName(stops[0].name) + '_to_' + safeName(stops[stops.length-1].name) + '.gpx';
+  var title = stops[0].name + ' to ' + stops[stops.length-1].name;
+  var via = stops.slice(1, -1).map(function(s) { return s.name; }).join(', ');
+
+  var gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  gpx += '<gpx version="1.1" creator="GoogleMaps-to-GPX"\n';
+  gpx += '  xmlns="http://www.topografix.com/GPX/1/1"\n';
+  gpx += '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n';
+  gpx += '  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">\n';
+  gpx += '  <metadata>\n';
+  gpx += '    ' + nameTag(title) + '\n';
+  gpx += '    <desc>' + (via ? 'Via ' + esc(via) + '. ' : '') + 'Route from OpenStreetMap via OSRM. ' + routeCoords.length + ' trackpoints.</desc>\n';
+  gpx += '    <time>' + new Date().toISOString() + '</time>\n';
+  gpx += '  </metadata>\n';
+
+  // Waypoints filtered by layer checkboxes
+  stops.forEach(function(s, i) {
+    var isStart = (i === 0);
+    var isEnd = (i === stops.length - 1);
+    var isMid = !isStart && !isEnd;
+
+    if (isStart && !lay.start) return;
+    if (isEnd && !lay.end) return;
+    if (isMid && !lay.mid) return;
+
+    var sym = isStart ? 'Flag, Green' : isEnd ? 'Flag, Red' : 'Pin, Blue';
+    var info = segmentData[i] ? ' | Next: ' + segmentData[i].miles + ' mi, ' + segmentData[i].minutes + ' min' : '';
+    gpx += '  <wpt lat="' + s.lat + '" lon="' + s.lon + '">\n';
+    gpx += '    ' + nameTag(s.name) + '\n';
+    gpx += '    <desc>Stop ' + (i+1) + info + '</desc>\n';
+    gpx += '    <sym>' + sym + '</sym>\n';
+    gpx += '  </wpt>\n';
+  });
+
+  // Shaping points — only if layer checked
+  if (lay.shape) {
+    shapingPoints.forEach(function(s) {
+      gpx += '  <wpt lat="' + s.lat + '" lon="' + s.lon + '">\n';
+      gpx += '    ' + nameTag(s.name) + '\n';
+      gpx += '    <desc>Route shaping point</desc>\n';
+      gpx += '    <sym>Waypoint</sym>\n';
+      gpx += '  </wpt>\n';
+    });
+  }
+
+  // Track — only if route layer checked
+  if (lay.route) {
+    gpx += '  <trk>\n';
+    gpx += '    ' + nameTag(title) + '\n';
+    gpx += '    <trkseg>\n';
+    routeCoords.forEach(function(c) {
+      gpx += '      <trkpt lat="' + c[0].toFixed(6) + '" lon="' + c[1].toFixed(6) + '"></trkpt>\n';
+    });
+    gpx += '    </trkseg>\n  </trk>\n';
+  }
+
+  gpx += '</gpx>';
+
+  var blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+
+  var included = [lay.route&&'route', lay.start&&'start', lay.mid&&'via', lay.shape&&'shape', lay.end&&'end'].filter(Boolean).join(', ');
+  log('GPX downloaded: "' + filename + '" — layers: ' + included + ' — ' + (blob.size/1024).toFixed(1) + ' KB');
+}
+
+// =============================================================
+// KML DOWNLOAD
+// =============================================================
+function downloadKML() {
+  if (!routeCoords.length || !stops.length) return;
+  var lay = getLayers();
+
+  var filename = safeName(stops[0].name) + '_to_' + safeName(stops[stops.length-1].name) + '.kml';
+  var title = stops[0].name + ' to ' + stops[stops.length-1].name;
+  var via = stops.slice(1, -1).map(function(s) { return s.name; }).join(', ');
+  var desc = via ? 'Via ' + via : '';
+
+  var kml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  kml += '<kml xmlns="http://www.opengis.net/kml/2.2">\n';
+  kml += '  <Document>\n';
+  kml += '    ' + nameTag(title) + '\n';
+  kml += '    <description>' + esc(desc) + '. Route from OpenStreetMap via OSRM. ' + routeCoords.length + ' points.</description>\n\n';
+
+  // Styles
+  kml += '    <Style id="routeLine">\n';
+  kml += '      <LineStyle><color>ff0070c4</color><width>4</width></LineStyle>\n';
+  kml += '    </Style>\n';
+  kml += '    <Style id="pinStart">\n';
+  kml += '      <IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-circle.png</href></Icon></IconStyle>\n';
+  kml += '    </Style>\n';
+  kml += '    <Style id="pinEnd">\n';
+  kml += '      <IconStyle><scale>1.2</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href></Icon></IconStyle>\n';
+  kml += '    </Style>\n';
+  kml += '    <Style id="pinMid">\n';
+  kml += '      <IconStyle><scale>1.0</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/pink-circle.png</href></Icon></IconStyle>\n';
+  kml += '    </Style>\n';
+  kml += '    <Style id="pinShape">\n';
+  kml += '      <IconStyle><scale>0.7</scale><Icon><href>http://maps.google.com/mapfiles/kml/paddle/ylw-circle.png</href></Icon></IconStyle>\n';
+  kml += '    </Style>\n\n';
+
+  // Route line — only if checked
+  if (lay.route) {
+    var coordLines = routeCoords.map(function(c) { return c[1].toFixed(6) + ',' + c[0].toFixed(6) + ',0'; }).join('\n              ');
+    kml += '    <Placemark>\n';
+    kml += '      ' + nameTag(title) + '\n';
+    kml += '      <description>' + esc(desc) + '</description>\n';
+    kml += '      <styleUrl>#routeLine</styleUrl>\n';
+    kml += '      <LineString>\n';
+    kml += '        <tessellate>1</tessellate>\n';
+    kml += '        <coordinates>\n              ' + coordLines + '\n        </coordinates>\n';
+    kml += '      </LineString>\n';
+    kml += '    </Placemark>\n';
+  }
+
+  // Waypoint placemarks — filtered by layer checkboxes
+  stops.forEach(function(s, i) {
+    var isStart = (i === 0);
+    var isEnd = (i === stops.length - 1);
+    var isMid = !isStart && !isEnd;
+
+    if (isStart && !lay.start) return;
+    if (isEnd && !lay.end) return;
+    if (isMid && !lay.mid) return;
+
+    var style = isStart ? '#pinStart' : isEnd ? '#pinEnd' : '#pinMid';
+    var legInfo = segmentData[i] ? ' | Next: ' + segmentData[i].miles + ' mi, ' + segmentData[i].minutes + ' min' : '';
+    kml += '\n    <Placemark>\n';
+    kml += '      ' + nameTag(s.name) + '\n';
+    kml += '      <description>Stop ' + (i + 1) + ' of ' + stops.length + legInfo + '</description>\n';
+    kml += '      <styleUrl>' + style + '</styleUrl>\n';
+    kml += '      <Point>\n';
+    kml += '        <coordinates>' + s.lon + ',' + s.lat + ',0</coordinates>\n';
+    kml += '      </Point>\n';
+    kml += '    </Placemark>\n';
+  });
+
+  // Shaping point placemarks — filtered by layer checkbox
+  if (lay.shape) {
+    shapingPoints.forEach(function(s) {
+      kml += '\n    <Placemark>\n';
+      kml += '      ' + nameTag(s.name) + '\n';
+      kml += '      <description>Route shaping point</description>\n';
+      kml += '      <styleUrl>#pinShape</styleUrl>\n';
+      kml += '      <Point>\n';
+      kml += '        <coordinates>' + s.lon + ',' + s.lat + ',0</coordinates>\n';
+      kml += '      </Point>\n';
+      kml += '    </Placemark>\n';
+    });
+  }
+
+  kml += '  </Document>\n</kml>';
+
+  var blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+
+  var included = [lay.route&&'route', lay.start&&'start', lay.mid&&'via', lay.shape&&'shape', lay.end&&'end'].filter(Boolean).join(', ');
+  log('KML downloaded: "' + filename + '" — layers: ' + included + ' — ' + (blob.size/1024).toFixed(1) + ' KB');
+}
+
+// =============================================================
+// EVENTS
+// =============================================================
+document.getElementById('urlInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') parseAndFetch();
+});
+window.addEventListener('load', function() { document.getElementById('urlInput').focus(); });
+</script>
+</body>
+</html>
