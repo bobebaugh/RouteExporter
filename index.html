@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b18">
+  <meta name="description" content="Combine Google Maps routes into one downloadable KML trip.">
+  <title>Route Exporter — Build one trip from many routes</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    :root {
+      --ink: #171b18;
+      --panel: #202621;
+      --panel-2: #293029;
+      --bone: #f4efe4;
+      --muted: #b9b8ad;
+      --mesa: #d77a45;
+      --mesa-dark: #ad5730;
+      --sage: #8ca58b;
+      --line: rgba(244, 239, 228, .12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ink);
+      color: var(--bone);
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(285px, 360px) 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 28px;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(215, 122, 69, .13), transparent 34%),
+        var(--panel);
+      border-right: 1px solid var(--line);
+      box-shadow: 12px 0 34px rgba(0, 0, 0, .22);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--mesa);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 500;
+      line-height: .98;
+      letter-spacing: -.045em;
+    }
+
+    .intro {
+      margin: 14px 0 25px;
+      color: var(--muted);
+      font-size: .92rem;
+      line-height: 1.55;
+    }
+
+    .trip-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .trip-heading h2 {
+      margin: 0 0 10px;
+      font-size: .76rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .text-button {
+      margin-bottom: 10px;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font-size: .76rem;
+    }
+
+    .text-button:hover { color: var(--bone); }
+
+    .segments {
+      flex: 1;
+      min-height: 110px;
+      max-height: calc(100vh - 390px);
+      overflow-y: auto;
+      padding: 10px 2px 10px 0;
+    }
+
+    .empty {
+      display: grid;
+      min-height: 96px;
+      place-items: center;
+      color: #8f948e;
+      font-size: .84rem;
+      text-align: center;
+      border: 1px dashed rgba(244, 239, 228, .15);
+      border-radius: 10px;
+    }
+
+    .segment {
+      display: grid;
+      grid-template-columns: 10px 1fr auto;
+      gap: 11px;
+      align-items: center;
+      margin-bottom: 8px;
+      padding: 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .swatch {
+      width: 8px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--mesa);
+    }
+
+    .segment strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: .85rem;
+    }
+
+    .segment span {
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .remove {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #aeb2ac;
+      font-size: 1.15rem;
+    }
+
+    .remove:hover {
+      background: rgba(255, 255, 255, .07);
+      color: var(--bone);
+    }
+
+    .summary {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin: 14px 0;
+    }
+
+    .summary-label {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--muted);
+      font-size: .72rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .distance {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 2rem;
+    }
+
+    .count {
+      padding-bottom: 5px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+
+    .export {
+      width: 100%;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--mesa);
+      color: white;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(215, 122, 69, .16);
+    }
+
+    .export:hover:not(:disabled) { background: #e1834c; }
+    .export:disabled { cursor: not-allowed; opacity: .38; }
+
+    .main {
+      position: relative;
+      display: grid;
+      min-width: 0;
+      grid-template-rows: auto 1fr;
+    }
+
+    .input-area {
+      position: relative;
+      z-index: 500;
+      display: flex;
+      gap: 10px;
+      padding: 18px;
+      background: rgba(23, 27, 24, .96);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field {
+      position: relative;
+      flex: 1;
+    }
+
+    input {
+      width: 100%;
+      height: 46px;
+      padding: 0 15px;
+      border: 1px solid rgba(244, 239, 228, .19);
+      border-radius: 8px;
+      outline: 0;
+      background: #2a302b;
+      color: var(--bone);
+    }
+
+    input:focus {
+      border-color: var(--mesa);
+      box-shadow: 0 0 0 3px rgba(215, 122, 69, .15);
+    }
+
+    .add {
+      min-width: 118px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--bone);
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .add:hover:not(:disabled) { background: white; }
+    .add:disabled { cursor: wait; opacity: .65; }
+
+    .status {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      display: none;
+      max-width: min(520px, 90vw);
+      padding: 9px 12px;
+      border-radius: 7px;
+      background: #562e25;
+      color: #ffe8df;
+      font-size: .8rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+    }
+
+    .status.visible { display: block; }
+
+    #map {
+      z-index: 1;
+      min-height: 450px;
+      background: #202722;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(23, 27, 24, .8) !important;
+      color: #c8cbc5;
+    }
+
+    .leaflet-control-attribution a { color: #e2a07a; }
+
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(62vh, 1fr); }
+      .sidebar { padding: 20px; border-right: 0; border-bottom: 1px solid var(--line); }
+      h1 { font-size: 2.2rem; }
+      .intro { margin-bottom: 18px; }
+      .segments { max-height: 155px; }
+      .main { min-height: 62vh; }
+      .input-area { padding: 12px; }
+      .add { min-width: 82px; }
+      #map { min-height: 52vh; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar">
+      <p class="eyebrow">Trip builder · v2.0</p>
+      <h1>Route<br>Exporter</h1>
+      <p class="intro">Paste Google Maps direction links, combine each route into one trip, then export the complete journey as KML.</p>
+
+      <div class="trip-heading">
+        <h2>Trip segments</h2>
+        <button class="text-button" id="clearButton" type="button" hidden>Clear all</button>
+      </div>
+      <div class="segments" id="segmentList">
+        <div class="empty">Your added routes will appear here.</div>
+      </div>
+
+      <div class="summary" aria-live="polite">
+        <div>
+          <span class="summary-label">Total distance</span>
+          <span class="distance"><span id="totalDistance">0.0</span> mi</span>
+        </div>
+        <span class="count" id="segmentCount">0 segments</span>
+      </div>
+      <button class="export" id="exportButton" type="button" disabled>Export trip as KML</button>
+    </aside>
+
+    <section class="main" aria-label="Route map">
+      <form class="input-area" id="routeForm">
+        <div class="field">
+          <label for="urlInput" class="summary-label">Google Maps directions link</label>
+          <input id="urlInput" type="url" inputmode="url" autocomplete="url" placeholder="https://maps.app.goo.gl/…" required>
+          <div class="status" id="status" role="alert"></div>
+        </div>
+        <button class="add" id="addButton" type="submit">Add route</button>
+      </form>
+      <div id="map"></div>
+    </section>
+  </main>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const MILES_PER_METER = 1 / 1609.344;
+      const segments = [];
+      const colors = ["#d77a45", "#8ca58b", "#d8ad63", "#79a6b6", "#be7d94"];
+      const form = document.getElementById("routeForm");
+      const input = document.getElementById("urlInput");
+      const addButton = document.getElementById("addButton");
+      const exportButton = document.getElementById("exportButton");
+      const clearButton = document.getElementById("clearButton");
+      const list = document.getElementById("segmentList");
+      const status = document.getElementById("status");
+
+      const map = L.map("map", { zoomControl: true }).setView([35.5951, -82.5515], 10);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+        maxZoom: 20,
+      }).addTo(map);
+      const layerGroup = L.featureGroup().addTo(map);
+
+      const setStatus = (message = "") => {
+        status.textContent = message;
+        status.classList.toggle("visible", Boolean(message));
+      };
+
+      const setLoading = (loading) => {
+        input.disabled = loading;
+        addButton.disabled = loading;
+        addButton.textContent = loading ? "Adding…" : "Add route";
+      };
+
+      const parseCoordinates = (url) => {
+        const points = [];
+        const seen = new Set();
+        const addPoint = (lat, lon) => {
+          const latitude = Number(lat);
+          const longitude = Number(lon);
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+          if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return;
+          const key = `${latitude},${longitude}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            points.push({ lat: latitude, lon: longitude });
+          }
+        };
+
+        for (const match of url.matchAll(/!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)) {
+          addPoint(match[2], match[1]);
+        }
+
+        if (points.length < 2) {
+          const path = new URL(url).pathname;
+          for (const match of path.matchAll(/(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/g)) {
+            addPoint(match[1], match[2]);
+          }
+        }
+        return points;
+      };
+
+      const resolveLink = async (url) => {
+        const parsed = new URL(url);
+        if (!["goo.gl", "maps.app.goo.gl"].includes(parsed.hostname)) return url;
+
+        const response = await fetch(`/.netlify/functions/unshorten?url=${encodeURIComponent(url)}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || "The short link could not be resolved.");
+        return data.longUrl;
+      };
+
+      const render = () => {
+        list.replaceChildren();
+        layerGroup.clearLayers();
+
+        if (!segments.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "Your added routes will appear here.";
+          list.append(empty);
+        }
+
+        segments.forEach((segment, index) => {
+          segment.layer = L.polyline(segment.points, {
+            color: segment.color,
+            weight: 5,
+            opacity: .92,
+          }).addTo(layerGroup);
+
+          const item = document.createElement("article");
+          item.className = "segment";
+          item.innerHTML = `
+            <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
+            <div><strong>Segment ${index + 1}</strong><span>${(segment.distance * MILES_PER_METER).toFixed(1)} miles</span></div>
+            <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
+          `;
+          list.append(item);
+        });
+
+        if (segments.length && layerGroup.getBounds().isValid()) {
+          map.fitBounds(layerGroup.getBounds(), { padding: [35, 35] });
+        }
+
+        const miles = segments.reduce((total, segment) => total + segment.distance, 0) * MILES_PER_METER;
+        document.getElementById("totalDistance").textContent = miles.toFixed(1);
+        document.getElementById("segmentCount").textContent = `${segments.length} ${segments.length === 1 ? "segment" : "segments"}`;
+        exportButton.disabled = !segments.length;
+        clearButton.hidden = !segments.length;
+      };
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setStatus();
+
+        let url;
+        try {
+          url = new URL(input.value.trim());
+          if (url.protocol !== "https:") throw new Error();
+        } catch {
+          setStatus("Paste a complete HTTPS Google Maps directions link.");
+          return;
+        }
+
+        if (!["google.com", "www.google.com", "maps.google.com", "goo.gl", "maps.app.goo.gl"].includes(url.hostname)) {
+          setStatus("This does not look like a Google Maps link.");
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const longUrl = await resolveLink(url.toString());
+          const coordinates = parseCoordinates(longUrl);
+          if (coordinates.length < 2) {
+            throw new Error("No route coordinates were found. In Google Maps, use Share → Copy link on a directions route.");
+          }
+
+          const coordinateString = coordinates.map(({ lon, lat }) => `${lon},${lat}`).join(";");
+          const osrm = `https://router.project-osrm.org/route/v1/driving/${coordinateString}?overview=full&geometries=geojson`;
+          const response = await fetch(osrm);
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data.code !== "Ok" || !data.routes?.[0]) {
+            throw new Error("The road route could not be calculated. Check the link and try again.");
+          }
+
+          const route = data.routes[0];
+          const color = colors[segments.length % colors.length];
+          segments.push({
+            distance: route.distance,
+            color,
+            points: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+          });
+          render();
+          input.value = "";
+          input.focus();
+        } catch (error) {
+          setStatus(error.message || "Something went wrong while adding the route.");
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      list.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-index]");
+        if (!button) return;
+        segments.splice(Number(button.dataset.index), 1);
+        render();
+      });
+
+      clearButton.addEventListener("click", () => {
+        segments.length = 0;
+        render();
+      });
+
+      exportButton.addEventListener("click", () => {
+        const placemarks = segments.map((segment, index) => {
+          const coordinates = segment.points.map(([lat, lon]) => `${lon},${lat},0`).join(" ");
+          return `<Placemark><name>Segment ${index + 1}</name><Style><LineStyle><color>ff457ad7</color><width>5</width></LineStyle></Style><LineString><tessellate>1</tessellate><coordinates>${coordinates}</coordinates></LineString></Placemark>`;
+        }).join("");
+        const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>My Trip</name>${placemarks}</Document></kml>`;
+        const blobUrl = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = "route-export.kml";
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+      });
+    });
+  </script>
+</body>
+</html>
