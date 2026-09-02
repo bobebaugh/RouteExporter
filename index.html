@@ -138,7 +138,11 @@
       background: var(--panel-2);
       border: 1px solid var(--line);
       border-radius: 10px;
+      cursor: grab;
     }
+
+    .segment.dragging { opacity: .45; }
+    .segment.drop-target { border-color: var(--mesa); }
 
     .swatch {
       width: 8px;
@@ -157,6 +161,16 @@
       color: var(--muted);
       font-size: .78rem;
     }
+
+    .source-link {
+      display: inline-block;
+      margin-top: 5px;
+      color: var(--sand);
+      font-size: .73rem;
+      text-decoration: none;
+    }
+
+    .source-link:hover { text-decoration: underline; }
 
     .remove {
       display: grid;
@@ -468,6 +482,7 @@
       const MILES_PER_METER = 1 / 1609.344;
       const segments = [];
       const colors = ["#f05a28", "#1684e8", "#a946d1", "#d99b00", "#00a884", "#e34878"];
+      let draggedSegmentIndex = null;
       const form = document.getElementById("routeForm");
       const input = document.getElementById("urlInput");
       const addButton = document.getElementById("addButton");
@@ -690,13 +705,44 @@
 
           const item = document.createElement("article");
           item.className = "segment";
-          const namedVia = segment.stops.length > 2 ? ` · via ${segment.stops.length - 2} named stop${segment.stops.length === 3 ? "" : "s"}` : "";
-          const shaping = segment.shapingPointCount ? ` · ${segment.shapingPointCount} shaping point${segment.shapingPointCount === 1 ? "" : "s"}` : "";
+          item.draggable = true;
+          item.dataset.index = String(index);
+          item.setAttribute("aria-label", `Drag to reorder route from ${segment.stops[0].name} to ${segment.stops.at(-1).name}`);
+          const details = [
+            segment.stops.length > 2 ? `via ${segment.stops.length - 2} named stop${segment.stops.length === 3 ? "" : "s"}` : "",
+            segment.shapingPointCount ? `${segment.shapingPointCount} shaping point${segment.shapingPointCount === 1 ? "" : "s"}` : "",
+          ].filter(Boolean).join(" · ");
           item.innerHTML = `
             <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
-            <div><strong>Segment ${index + 1}</strong><span>${escapeXml(segment.stops[0].name)} → ${escapeXml(segment.stops.at(-1).name)}${namedVia}${shaping}<br>${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span></div>
+            <div><strong>FROM ${escapeXml(segment.stops[0].name)} TO ${escapeXml(segment.stops.at(-1).name)}</strong><span>${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
             <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
           `;
+          item.addEventListener("dragstart", (event) => {
+            draggedSegmentIndex = index;
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", String(index));
+            item.classList.add("dragging");
+          });
+          item.addEventListener("dragend", () => {
+            draggedSegmentIndex = null;
+            document.querySelectorAll(".segment.drop-target").forEach((target) => target.classList.remove("drop-target"));
+            item.classList.remove("dragging");
+          });
+          item.addEventListener("dragover", (event) => {
+            if (draggedSegmentIndex === null || draggedSegmentIndex === index) return;
+            event.preventDefault();
+            item.classList.add("drop-target");
+          });
+          item.addEventListener("dragleave", () => item.classList.remove("drop-target"));
+          item.addEventListener("drop", (event) => {
+            event.preventDefault();
+            const from = draggedSegmentIndex;
+            item.classList.remove("drop-target");
+            if (from === null || from === index) return;
+            const [moved] = segments.splice(from, 1);
+            segments.splice(index, 0, moved);
+            render(false);
+          });
           list.append(item);
         });
 
@@ -749,6 +795,8 @@
             distance: route.distanceMeters,
             duration: parseDuration(route.duration),
             color,
+            sourceUrl: url.toString(),
+            avoidHighways: avoidHighways.checked,
             encodedPolyline: route.encodedPolyline,
             points: routeGeometry,
             stops,
@@ -811,51 +859,61 @@
       const tripSnapshot = () => {
         const center = map.getCenter();
         return {
-          version: 1,
+          version: 2,
           mapStyle: currentMapStyle,
           view: { lat: center.lat, lon: center.lng, zoom: map.getZoom() },
           segments: segments.map((segment) => ({
-            distance: segment.distance,
-            duration: segment.duration,
             color: segment.color,
-            encodedPolyline: segment.encodedPolyline,
-            stops: segment.stops.map(({ lat, lon, name }) => ({ lat, lon, name })),
-            shapingPointCount: segment.shapingPointCount,
+            sourceUrl: segment.sourceUrl,
+            avoidHighways: Boolean(segment.avoidHighways),
           })),
         };
       };
 
-      const restoreTrip = (trip) => {
-        if (trip?.version !== 1 || !Array.isArray(trip.segments) || !trip.segments.length) throw new Error("This trip link is not valid.");
-        const restored = trip.segments.map((segment) => {
-          if (!Number.isFinite(segment.distance) || !Number.isFinite(segment.duration) || !/^#[0-9a-f]{6}$/i.test(segment.color) || typeof segment.encodedPolyline !== "string" || !Array.isArray(segment.stops) || segment.stops.length < 2) {
-            throw new Error("This trip link contains an invalid route.");
-          }
-          const stops = segment.stops.map((stop) => {
-            if (!Number.isFinite(stop?.lat) || !Number.isFinite(stop?.lon) || Math.abs(stop.lat) > 90 || Math.abs(stop.lon) > 180 || typeof stop.name !== "string") {
-              throw new Error("This trip link contains an invalid stop.");
+      const restoreTrip = async (trip) => {
+        if (trip?.version !== 2 || !Array.isArray(trip.segments) || !trip.segments.length) throw new Error("This trip link is not valid.");
+        setLoading(true);
+        setStatus("Rebuilding the shared trip…");
+        try {
+          const restored = [];
+          for (const segment of trip.segments) {
+            if (!/^#[0-9a-f]{6}$/i.test(segment?.color) || typeof segment.sourceUrl !== "string") throw new Error("This trip link contains an invalid route.");
+            const sourceUrl = new URL(segment.sourceUrl);
+            if (sourceUrl.protocol !== "https:" || !["google.com", "www.google.com", "maps.google.com", "goo.gl", "maps.app.goo.gl"].includes(sourceUrl.hostname)) {
+              throw new Error("This trip link contains an invalid Google Maps link.");
             }
-            return { lat: stop.lat, lon: stop.lon, name: stop.name, isNamedStop: true };
-          });
-          const points = decodePolyline(segment.encodedPolyline);
-          if (points.length < 2) throw new Error("This trip link contains an invalid route line.");
-          return {
-            distance: segment.distance,
-            duration: segment.duration,
-            color: segment.color,
-            encodedPolyline: segment.encodedPolyline,
-            points,
-            stops,
-            shapingPointCount: Number.isInteger(segment.shapingPointCount) && segment.shapingPointCount >= 0 ? segment.shapingPointCount : 0,
-          };
-        });
-        segments.push(...restored);
-        setMapStyle(trip.mapStyle);
-        render(false);
-        if (Number.isFinite(trip.view?.lat) && Number.isFinite(trip.view?.lon) && Number.isFinite(trip.view?.zoom)) {
-          map.setView([trip.view.lat, trip.view.lon], trip.view.zoom);
-        } else if (layerGroup.getBounds().isValid()) {
-          map.fitBounds(layerGroup.getBounds(), { padding: [35, 35] });
+            const longUrl = await resolveLink(sourceUrl.toString());
+            const routePoints = parseRoutePoints(longUrl);
+            const stops = routePoints.filter((point) => point.isNamedStop);
+            if (routePoints.length < 2 || stops.length < 2) throw new Error("A route in this shared trip no longer contains usable Google Maps stops.");
+            const route = await calculateRoute(routePoints, Boolean(segment.avoidHighways));
+            const points = decodePolyline(route.encodedPolyline);
+            if (points.length < 2) throw new Error("Google returned a route without usable map geometry.");
+            restored.push({
+              distance: route.distanceMeters,
+              duration: parseDuration(route.duration),
+              color: segment.color,
+              sourceUrl: sourceUrl.toString(),
+              avoidHighways: Boolean(segment.avoidHighways),
+              encodedPolyline: route.encodedPolyline,
+              points,
+              stops,
+              shapingPointCount: routePoints.length - stops.length,
+            });
+          }
+          segments.push(...restored);
+          setMapStyle(trip.mapStyle);
+          render(false);
+          if (Number.isFinite(trip.view?.lat) && Number.isFinite(trip.view?.lon) && Number.isFinite(trip.view?.zoom)) {
+            map.setView([trip.view.lat, trip.view.lon], trip.view.zoom);
+          } else if (layerGroup.getBounds().isValid()) {
+            map.fitBounds(layerGroup.getBounds(), { padding: [35, 35] });
+          }
+          if (trip.segments.every((segment) => Boolean(segment.avoidHighways))) avoidHighways.checked = true;
+          if (trip.segments.every((segment) => !segment.avoidHighways)) avoidHighways.checked = false;
+          setStatus("");
+        } finally {
+          setLoading(false);
         }
       };
 
