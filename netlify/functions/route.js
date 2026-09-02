@@ -66,7 +66,7 @@ exports.handler = async (event) => {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": process.env.GOOGLE_ROUTES_API_KEY,
-        "X-Goog-FieldMask": "routes.distanceMeters,routes.polyline.encodedPolyline",
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
       },
       body: JSON.stringify(body),
       ...(signal ? { signal } : {}),
@@ -91,6 +91,7 @@ exports.handler = async (event) => {
 
   return json(200, {
     distanceMeters: route.distanceMeters,
+    duration: route.duration,
     encodedPolyline: route.polyline.encodedPolyline,
   });
 };
