@@ -474,7 +474,7 @@
         addButton.textContent = loading ? "Adding…" : "Add route";
       };
 
-      const parseNamedStops = (url) => {
+      const parseRoutePoints = (url) => {
         const points = [];
         const addPoint = (lat, lon) => {
           const latitude = Number(lat);
@@ -484,13 +484,15 @@
           points.push({ lat: latitude, lon: longitude });
         };
 
-        // Google Maps marks a named destination or waypoint as !2m2.  A point
-        // created by dragging the displayed route is !1m2, so it is deliberately
-        // excluded instead of silently becoming an OSRM routing stop.
+        // Google Maps marks a named stop as !2m2 and a point created by dragging
+        // the route as !1m2. Both must be sent to OSRM in this exact order: the
+        // latter is geometry-only, so it deliberately has no label or marker.
         const parsedUrl = new URL(url);
         const routeData = parsedUrl.searchParams.get("data") || url;
-        for (const match of routeData.matchAll(/!2m2!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)) {
-          addPoint(match[2], match[1]);
+        for (const match of routeData.matchAll(/!(2m2|1m2)!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)) {
+          const before = points.length;
+          addPoint(match[3], match[2]);
+          if (points.length > before) points.at(-1).isNamedStop = match[1] === "2m2";
         }
 
         const path = parsedUrl.pathname;
@@ -505,10 +507,13 @@
               })
           : [];
 
-        return points.map((point, index) => ({
-          ...point,
-          name: names[index] || `Waypoint ${index + 1}`,
-        }));
+        let namedIndex = 0;
+        return points.map((point) => {
+          if (!point.isNamedStop) return point;
+          const namedPoint = { ...point, name: names[namedIndex] || `Stop ${namedIndex + 1}` };
+          namedIndex += 1;
+          return namedPoint;
+        });
       };
 
       const escapeXml = (value) => String(value)
@@ -572,10 +577,11 @@
 
           const item = document.createElement("article");
           item.className = "segment";
-          const via = segment.stops.length > 2 ? ` · via ${segment.stops.length - 2}` : "";
+          const namedVia = segment.stops.length > 2 ? ` · via ${segment.stops.length - 2} named stop${segment.stops.length === 3 ? "" : "s"}` : "";
+          const shaping = segment.shapingPointCount ? ` · ${segment.shapingPointCount} shaping point${segment.shapingPointCount === 1 ? "" : "s"}` : "";
           item.innerHTML = `
             <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
-            <div><strong>Segment ${index + 1}</strong><span>${escapeXml(segment.stops[0].name)} → ${escapeXml(segment.stops.at(-1).name)}${via}<br>${(segment.distance * MILES_PER_METER).toFixed(1)} miles</span></div>
+            <div><strong>Segment ${index + 1}</strong><span>${escapeXml(segment.stops[0].name)} → ${escapeXml(segment.stops.at(-1).name)}${namedVia}${shaping}<br>${(segment.distance * MILES_PER_METER).toFixed(1)} miles</span></div>
             <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
           `;
           list.append(item);
@@ -613,12 +619,13 @@
         setLoading(true);
         try {
           const longUrl = await resolveLink(url.toString());
-          const stops = parseNamedStops(longUrl);
-          if (stops.length < 2) {
-            throw new Error("No named route stops were found. Open the shared route, then copy its full Google Maps directions URL.");
+          const routePoints = parseRoutePoints(longUrl);
+          const stops = routePoints.filter((point) => point.isNamedStop);
+          if (routePoints.length < 2 || stops.length < 2) {
+            throw new Error("No route stops were found. Open the shared route, then copy its full Google Maps directions URL.");
           }
 
-          const coordinateString = stops.map(({ lon, lat }) => `${lon},${lat}`).join(";");
+          const coordinateString = routePoints.map(({ lon, lat }) => `${lon},${lat}`).join(";");
           const options = new URLSearchParams({ overview: "full", geometries: "geojson" });
           if (avoidHighways.checked) options.set("exclude", "motorway");
           const osrm = `https://router.project-osrm.org/route/v1/driving/${coordinateString}?${options}`;
@@ -636,6 +643,7 @@
             color,
             points: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
             stops,
+            shapingPointCount: routePoints.length - stops.length,
           });
           render();
           input.value = "";
