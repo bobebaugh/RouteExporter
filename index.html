@@ -177,9 +177,9 @@
     }
 
     .summary {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
       margin: 14px 0;
     }
 
@@ -197,11 +197,20 @@
       font-size: 2rem;
     }
 
+    .duration {
+      display: block;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.2rem;
+      line-height: 1.2;
+    }
+
     .count {
-      padding-bottom: 5px;
+      grid-column: 1 / -1;
       color: var(--muted);
       font-size: .8rem;
     }
+
+    .actions { display: grid; gap: 8px; }
 
     .export {
       width: 100%;
@@ -216,6 +225,19 @@
 
     .export:hover:not(:disabled) { background: #e1834c; }
     .export:disabled { cursor: not-allowed; opacity: .38; }
+
+    .share {
+      width: 100%;
+      padding: 11px 16px;
+      border: 1px solid rgba(244, 239, 228, .32);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--bone);
+      font-weight: 750;
+    }
+
+    .share:hover:not(:disabled) { border-color: var(--bone); background: rgba(255, 255, 255, .06); }
+    .share:disabled { cursor: not-allowed; opacity: .38; }
 
     .main {
       position: relative;
@@ -406,9 +428,16 @@
           <span class="summary-label">Total distance</span>
           <span class="distance"><span id="totalDistance">0.0</span> mi</span>
         </div>
+        <div>
+          <span class="summary-label">Total driving time</span>
+          <span class="duration" id="totalDuration">0 min</span>
+        </div>
         <span class="count" id="segmentCount">0 segments</span>
       </div>
-      <button class="export" id="exportButton" type="button" disabled>Export trip as KML</button>
+      <div class="actions">
+        <button class="export" id="exportButton" type="button" disabled>Export trip as KML</button>
+        <button class="share" id="shareButton" type="button" disabled>Copy trip link</button>
+      </div>
     </aside>
 
     <section class="main" aria-label="Route map">
@@ -427,7 +456,7 @@
       <div class="map-wrap">
         <div class="map-style-toggle" role="group" aria-label="Map style">
           <button class="active" type="button" data-map-style="standard" aria-pressed="true">Standard</button>
-          <button type="button" data-map-style="cyclosm" aria-pressed="false">CyclOSM</button>
+          <button type="button" data-map-style="terrain" aria-pressed="false">Terrain</button>
         </div>
         <div id="map"></div>
       </div>
@@ -443,6 +472,7 @@
       const input = document.getElementById("urlInput");
       const addButton = document.getElementById("addButton");
       const exportButton = document.getElementById("exportButton");
+      const shareButton = document.getElementById("shareButton");
       const clearButton = document.getElementById("clearButton");
       const list = document.getElementById("segmentList");
       const status = document.getElementById("status");
@@ -454,25 +484,32 @@
           attribution: "&copy; OpenStreetMap contributors",
           maxZoom: 19,
         }),
-        cyclosm: L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors | CyclOSM",
-          maxZoom: 20,
+        terrain: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+          attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)",
+          maxNativeZoom: 17,
+          maxZoom: 19,
         }),
       };
       let currentTileLayer = tileLayers.standard.addTo(map);
+      let currentMapStyle = "standard";
       const layerGroup = L.featureGroup().addTo(map);
 
-      document.querySelector(".map-style-toggle").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-map-style]");
-        if (!button || button.classList.contains("active")) return;
-        const style = button.dataset.mapStyle;
+      const setMapStyle = (style) => {
+        if (!tileLayers[style] || style === currentMapStyle) return;
         currentTileLayer.remove();
         currentTileLayer = tileLayers[style].addTo(map);
+        currentMapStyle = style;
         document.querySelectorAll("[data-map-style]").forEach((option) => {
-          const active = option === button;
+          const active = option.dataset.mapStyle === style;
           option.classList.toggle("active", active);
           option.setAttribute("aria-pressed", String(active));
         });
+      };
+
+      document.querySelector(".map-style-toggle").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-map-style]");
+        if (!button) return;
+        setMapStyle(button.dataset.mapStyle);
       });
 
       const setStatus = (message = "") => {
@@ -581,6 +618,19 @@
         return points;
       };
 
+      const parseDuration = (duration) => {
+        const match = String(duration || "").match(/^(\d+(?:\.\d+)?)s$/);
+        return match ? Number(match[1]) : 0;
+      };
+
+      const formatDuration = (seconds) => {
+        const totalMinutes = Math.round(seconds / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        if (hours) return `${hours} hr ${minutes} min`;
+        return `${minutes} min`;
+      };
+
       const calculateRoute = async (routePoints, shouldAvoidHighways) => {
         const signal = typeof AbortSignal?.timeout === "function" ? AbortSignal.timeout(25000) : undefined;
         const response = await fetch("/.netlify/functions/route", {
@@ -596,7 +646,7 @@
         return data;
       };
 
-      const render = () => {
+      const render = (fitMap = true) => {
         list.replaceChildren();
         layerGroup.clearLayers();
 
@@ -644,20 +694,23 @@
           const shaping = segment.shapingPointCount ? ` · ${segment.shapingPointCount} shaping point${segment.shapingPointCount === 1 ? "" : "s"}` : "";
           item.innerHTML = `
             <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
-            <div><strong>Segment ${index + 1}</strong><span>${escapeXml(segment.stops[0].name)} → ${escapeXml(segment.stops.at(-1).name)}${namedVia}${shaping}<br>${(segment.distance * MILES_PER_METER).toFixed(1)} miles</span></div>
+            <div><strong>Segment ${index + 1}</strong><span>${escapeXml(segment.stops[0].name)} → ${escapeXml(segment.stops.at(-1).name)}${namedVia}${shaping}<br>${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span></div>
             <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
           `;
           list.append(item);
         });
 
-        if (segments.length && layerGroup.getBounds().isValid()) {
+        if (fitMap && segments.length && layerGroup.getBounds().isValid()) {
           map.fitBounds(layerGroup.getBounds(), { padding: [35, 35] });
         }
 
         const miles = segments.reduce((total, segment) => total + segment.distance, 0) * MILES_PER_METER;
+        const duration = segments.reduce((total, segment) => total + segment.duration, 0);
         document.getElementById("totalDistance").textContent = miles.toFixed(1);
+        document.getElementById("totalDuration").textContent = formatDuration(duration);
         document.getElementById("segmentCount").textContent = `${segments.length} ${segments.length === 1 ? "segment" : "segments"}`;
         exportButton.disabled = !segments.length;
+        shareButton.disabled = !segments.length;
         clearButton.hidden = !segments.length;
       };
 
@@ -694,7 +747,9 @@
           const color = colors[segments.length % colors.length];
           segments.push({
             distance: route.distanceMeters,
+            duration: parseDuration(route.duration),
             color,
+            encodedPolyline: route.encodedPolyline,
             points: routeGeometry,
             stops,
             shapingPointCount: routePoints.length - stops.length,
@@ -721,6 +776,105 @@
         render();
       });
 
+      const bytesToBase64Url = (bytes) => {
+        let binary = "";
+        for (let start = 0; start < bytes.length; start += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+        }
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      };
+
+      const base64UrlToBytes = (value) => {
+        const base64 = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
+        const binary = atob(base64);
+        return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      };
+
+      const encodeTrip = async (trip) => {
+        const bytes = new TextEncoder().encode(JSON.stringify(trip));
+        if (typeof CompressionStream !== "function") return `json.${bytesToBase64Url(bytes)}`;
+        const compressed = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+        const output = new Uint8Array(await new Response(compressed).arrayBuffer());
+        return `gz.${bytesToBase64Url(output)}`;
+      };
+
+      const decodeTrip = async (value) => {
+        const [encoding, payload] = value.split(".", 2);
+        if (!payload) throw new Error("The trip link is incomplete.");
+        const bytes = base64UrlToBytes(payload);
+        if (encoding === "json") return JSON.parse(new TextDecoder().decode(bytes));
+        if (encoding !== "gz" || typeof DecompressionStream !== "function") throw new Error("This browser cannot open the shared trip link.");
+        const decompressed = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+        return JSON.parse(new TextDecoder().decode(await new Response(decompressed).arrayBuffer()));
+      };
+
+      const tripSnapshot = () => {
+        const center = map.getCenter();
+        return {
+          version: 1,
+          mapStyle: currentMapStyle,
+          view: { lat: center.lat, lon: center.lng, zoom: map.getZoom() },
+          segments: segments.map((segment) => ({
+            distance: segment.distance,
+            duration: segment.duration,
+            color: segment.color,
+            encodedPolyline: segment.encodedPolyline,
+            stops: segment.stops.map(({ lat, lon, name }) => ({ lat, lon, name })),
+            shapingPointCount: segment.shapingPointCount,
+          })),
+        };
+      };
+
+      const restoreTrip = (trip) => {
+        if (trip?.version !== 1 || !Array.isArray(trip.segments) || !trip.segments.length) throw new Error("This trip link is not valid.");
+        const restored = trip.segments.map((segment) => {
+          if (!Number.isFinite(segment.distance) || !Number.isFinite(segment.duration) || !/^#[0-9a-f]{6}$/i.test(segment.color) || typeof segment.encodedPolyline !== "string" || !Array.isArray(segment.stops) || segment.stops.length < 2) {
+            throw new Error("This trip link contains an invalid route.");
+          }
+          const stops = segment.stops.map((stop) => {
+            if (!Number.isFinite(stop?.lat) || !Number.isFinite(stop?.lon) || Math.abs(stop.lat) > 90 || Math.abs(stop.lon) > 180 || typeof stop.name !== "string") {
+              throw new Error("This trip link contains an invalid stop.");
+            }
+            return { lat: stop.lat, lon: stop.lon, name: stop.name, isNamedStop: true };
+          });
+          const points = decodePolyline(segment.encodedPolyline);
+          if (points.length < 2) throw new Error("This trip link contains an invalid route line.");
+          return {
+            distance: segment.distance,
+            duration: segment.duration,
+            color: segment.color,
+            encodedPolyline: segment.encodedPolyline,
+            points,
+            stops,
+            shapingPointCount: Number.isInteger(segment.shapingPointCount) && segment.shapingPointCount >= 0 ? segment.shapingPointCount : 0,
+          };
+        });
+        segments.push(...restored);
+        setMapStyle(trip.mapStyle);
+        render(false);
+        if (Number.isFinite(trip.view?.lat) && Number.isFinite(trip.view?.lon) && Number.isFinite(trip.view?.zoom)) {
+          map.setView([trip.view.lat, trip.view.lon], trip.view.zoom);
+        } else if (layerGroup.getBounds().isValid()) {
+          map.fitBounds(layerGroup.getBounds(), { padding: [35, 35] });
+        }
+      };
+
+      const copyTripLink = async () => {
+        const encodedTrip = await encodeTrip(tripSnapshot());
+        const shareUrl = `${location.origin}${location.pathname}#trip=${encodedTrip}`;
+        await navigator.clipboard.writeText(shareUrl);
+        shareButton.textContent = "Trip link copied";
+        setTimeout(() => { shareButton.textContent = "Copy trip link"; }, 1800);
+      };
+
+      shareButton.addEventListener("click", async () => {
+        try {
+          await copyTripLink();
+        } catch {
+          setStatus("The trip link could not be copied. Please try again.");
+        }
+      });
+
       exportButton.addEventListener("click", () => {
         const placemarks = segments.map((segment, index) => {
           const coordinates = segment.points.map(([lat, lon]) => `${lon},${lat},0`).join(" ");
@@ -736,6 +890,13 @@
         link.click();
         URL.revokeObjectURL(blobUrl);
       });
+
+      const sharedTrip = new URLSearchParams(location.hash.slice(1)).get("trip");
+      if (sharedTrip) {
+        decodeTrip(sharedTrip).then(restoreTrip).catch((error) => {
+          setStatus(error.message || "The shared trip link could not be opened.");
+        });
+      }
     });
   </script>
 </body>
