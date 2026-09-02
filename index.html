@@ -357,6 +357,18 @@
 
     .leaflet-control-attribution a { color: var(--mesa-dark); }
 
+    .leaflet-tooltip.waypoint-label {
+      padding: 3px 6px;
+      border: 1px solid rgba(23, 27, 24, .55);
+      border-radius: 4px;
+      background: rgba(255, 250, 240, .94);
+      color: #252b25;
+      font-size: .72rem;
+      font-weight: 750;
+      white-space: nowrap;
+      box-shadow: 0 1px 4px rgba(23, 27, 24, .2);
+    }
+
     @media (max-width: 760px) {
       .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(62vh, 1fr); }
       .sidebar { padding: 20px; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -572,7 +584,12 @@
               fillOpacity: 1,
               weight: 2,
               radius: 6,
-            }).bindTooltip(stop.name, { direction: "top" }).addTo(layerGroup);
+            }).bindTooltip(stop.name, {
+              className: "waypoint-label",
+              direction: "top",
+              offset: [0, -7],
+              permanent: true,
+            }).addTo(layerGroup);
           });
 
           const item = document.createElement("article");
