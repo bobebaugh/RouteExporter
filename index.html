@@ -813,7 +813,7 @@
       });
 
       list.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-index]");
+        const button = event.target.closest("button.remove[data-index]");
         if (!button) return;
         segments.splice(Number(button.dataset.index), 1);
         render();
