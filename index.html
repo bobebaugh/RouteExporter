@@ -154,12 +154,14 @@
     .segment strong {
       display: block;
       margin-bottom: 3px;
-      font-size: .85rem;
+      font-size: .76rem;
+      line-height: 1.3;
     }
 
     .segment span {
       color: var(--muted);
-      font-size: .78rem;
+      font-size: .73rem;
+      line-height: 1.3;
     }
 
     .source-link {
@@ -587,6 +589,8 @@
         .replace(/\"/g, "&quot;")
         .replace(/'/g, "&apos;");
 
+      const shortStopName = (name) => String(name).split(",")[0].trim() || String(name);
+
       const kmlColor = (hex) => {
         const rgb = hex.slice(1);
         return `ff${rgb.slice(4, 6)}${rgb.slice(2, 4)}${rgb.slice(0, 2)}`;
@@ -708,13 +712,15 @@
           item.draggable = true;
           item.dataset.index = String(index);
           item.setAttribute("aria-label", `Drag to reorder route from ${segment.stops[0].name} to ${segment.stops.at(-1).name}`);
+          const firstStop = shortStopName(segment.stops[0].name);
+          const lastStop = shortStopName(segment.stops.at(-1).name);
           const details = [
             segment.stops.length > 2 ? `via ${segment.stops.length - 2} named stop${segment.stops.length === 3 ? "" : "s"}` : "",
             segment.shapingPointCount ? `${segment.shapingPointCount} shaping point${segment.shapingPointCount === 1 ? "" : "s"}` : "",
           ].filter(Boolean).join(" · ");
           item.innerHTML = `
             <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
-            <div><strong>FROM ${escapeXml(segment.stops[0].name)} TO ${escapeXml(segment.stops.at(-1).name)}</strong><span>${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
+            <div><strong title="From ${escapeXml(segment.stops[0].name)} to ${escapeXml(segment.stops.at(-1).name)}">FROM ${escapeXml(firstStop)} TO ${escapeXml(lastStop)}</strong><span>${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
             <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
           `;
           item.addEventListener("dragstart", (event) => {
