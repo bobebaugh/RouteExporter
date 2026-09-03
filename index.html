@@ -574,12 +574,16 @@
           : [];
 
         let namedIndex = 0;
-        return points.map((point) => {
+        const labelledPoints = points.map((point) => {
           if (!point.isNamedStop) return point;
           const namedPoint = { ...point, name: names[namedIndex] || `Stop ${namedIndex + 1}` };
           namedIndex += 1;
           return namedPoint;
         });
+        // The URL path is the authoritative list of requested endpoints. Google
+        // occasionally exposes fewer corresponding !2m2 marker coordinates, so
+        // keep it separately from the marker list used for routing and map labels.
+        return { points: labelledPoints, routeNames: names };
       };
 
       const escapeXml = (value) => String(value)
@@ -676,6 +680,7 @@
           list.append(empty);
         }
 
+        const renderedStopKeys = new Set();
         segments.forEach((segment, index) => {
           L.polyline(segment.points, {
             color: "#172018",
@@ -692,17 +697,27 @@
             lineJoin: "round",
           }).addTo(layerGroup);
 
-          segment.stops.forEach((stop) => {
+          segment.stops.forEach((stop, stopIndex) => {
+            const stopKey = `${stop.lat.toFixed(6)},${stop.lon.toFixed(6)},${stop.name}`;
+            if (renderedStopKeys.has(stopKey)) return;
+            renderedStopKeys.add(stopKey);
+            const labelPositions = [
+              { direction: "top", offset: [0, -7] },
+              { direction: "bottom", offset: [0, 7] },
+              { direction: "right", offset: [8, 0] },
+              { direction: "left", offset: [-8, 0] },
+            ];
+            const labelPosition = labelPositions[(index + stopIndex) % labelPositions.length];
             L.circleMarker([stop.lat, stop.lon], {
               color: "#fffaf0",
               fillColor: segment.color,
               fillOpacity: 1,
               weight: 2,
               radius: 6,
-            }).bindTooltip(stop.name, {
+            }).bindTooltip(shortStopName(stop.name), {
               className: "waypoint-label",
-              direction: "top",
-              offset: [0, -7],
+              direction: labelPosition.direction,
+              offset: labelPosition.offset,
               permanent: true,
             }).addTo(layerGroup);
           });
@@ -711,16 +726,18 @@
           item.className = "segment";
           item.draggable = true;
           item.dataset.index = String(index);
-          item.setAttribute("aria-label", `Drag to reorder route from ${segment.stops[0].name} to ${segment.stops.at(-1).name}`);
-          const firstStop = shortStopName(segment.stops[0].name);
-          const lastStop = shortStopName(segment.stops.at(-1).name);
+          const firstStopName = segment.startName || segment.stops[0].name;
+          const lastStopName = segment.endName || segment.stops.at(-1).name;
+          item.setAttribute("aria-label", `Drag to reorder route from ${firstStopName} to ${lastStopName}`);
+          const firstStop = shortStopName(firstStopName);
+          const lastStop = shortStopName(lastStopName);
           const details = [
             segment.stops.length > 2 ? `via ${segment.stops.length - 2} named stop${segment.stops.length === 3 ? "" : "s"}` : "",
             segment.shapingPointCount ? `${segment.shapingPointCount} shaping point${segment.shapingPointCount === 1 ? "" : "s"}` : "",
           ].filter(Boolean).join(" · ");
           item.innerHTML = `
             <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
-            <div><strong title="From ${escapeXml(segment.stops[0].name)} to ${escapeXml(segment.stops.at(-1).name)}">FROM ${escapeXml(firstStop)} TO ${escapeXml(lastStop)}</strong><span>${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
+            <div><strong title="From ${escapeXml(firstStopName)} to ${escapeXml(lastStopName)}">FROM ${escapeXml(firstStop)} TO ${escapeXml(lastStop)}</strong><span>${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
             <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
           `;
           item.addEventListener("dragstart", (event) => {
@@ -787,7 +804,8 @@
         setLoading(true);
         try {
           const longUrl = await resolveLink(url.toString());
-          const routePoints = parseRoutePoints(longUrl);
+          const parsedRoute = parseRoutePoints(longUrl);
+          const routePoints = parsedRoute.points;
           const stops = routePoints.filter((point) => point.isNamedStop);
           if (routePoints.length < 2 || stops.length < 2) {
             throw new Error("No route stops were found. Open the shared route, then copy its full Google Maps directions URL.");
@@ -806,6 +824,8 @@
             encodedPolyline: route.encodedPolyline,
             points: routeGeometry,
             stops,
+            startName: parsedRoute.routeNames[0] || stops[0].name,
+            endName: parsedRoute.routeNames.at(-1) || stops.at(-1).name,
             shapingPointCount: routePoints.length - stops.length,
           });
           render();
@@ -889,7 +909,8 @@
               throw new Error("This trip link contains an invalid Google Maps link.");
             }
             const longUrl = await resolveLink(sourceUrl.toString());
-            const routePoints = parseRoutePoints(longUrl);
+            const parsedRoute = parseRoutePoints(longUrl);
+            const routePoints = parsedRoute.points;
             const stops = routePoints.filter((point) => point.isNamedStop);
             if (routePoints.length < 2 || stops.length < 2) throw new Error("A route in this shared trip no longer contains usable Google Maps stops.");
             const route = await calculateRoute(routePoints, Boolean(segment.avoidHighways));
@@ -904,6 +925,8 @@
               encodedPolyline: route.encodedPolyline,
               points,
               stops,
+              startName: parsedRoute.routeNames[0] || stops[0].name,
+              endName: parsedRoute.routeNames.at(-1) || stops.at(-1).name,
               shapingPointCount: routePoints.length - stops.length,
             });
           }
