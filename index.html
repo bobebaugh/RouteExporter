@@ -550,9 +550,8 @@
           points.push({ lat: latitude, lon: longitude });
         };
 
-        // Google Maps marks a named stop as !2m2 and a point created by dragging
-        // the route as !1m2. Both must be sent to Google Routes in this exact order: the
-        // latter is geometry-only, so it deliberately has no label or marker.
+        // Google Maps normally marks a named stop as !2m2 and a point created by
+        // dragging as !1m2. Both must be sent to Google Routes in this exact order.
         const parsedUrl = new URL(url);
         const routeData = parsedUrl.searchParams.get("data") || url;
         for (const match of routeData.matchAll(/!(2m2|1m2)!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)) {
@@ -572,6 +571,21 @@
                 catch { return part; }
               })
           : [];
+
+        // Google sometimes encodes a listed route stop (often a plain street address)
+        // as !1m2. When the directions path lists more stops than !2m2 supplied,
+        // promote only the missing coordinates in order. The remaining !1m2 points
+        // are true unlabeled shapers.
+        let namedPointCount = points.filter((point) => point.isNamedStop).length;
+        const expectedNamedPointCount = Math.min(names.length, points.length);
+        if (namedPointCount < expectedNamedPointCount) {
+          for (const point of points) {
+            if (point.isNamedStop) continue;
+            point.isNamedStop = true;
+            namedPointCount += 1;
+            if (namedPointCount === expectedNamedPointCount) break;
+          }
+        }
 
         let namedIndex = 0;
         const labelledPoints = points.map((point) => {
