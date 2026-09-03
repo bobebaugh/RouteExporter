@@ -607,7 +607,15 @@
         .replace(/\"/g, "&quot;")
         .replace(/'/g, "&apos;");
 
-      const shortStopName = (name) => String(name).split(",")[0].trim() || String(name);
+      const shortStopName = (name) => {
+        const primary = String(name).split(",")[0].trim() || String(name);
+        // A numbered street address is commonly an intentional road-shaping
+        // waypoint. Show its road name, not an arbitrary house number, while
+        // retaining POI names such as "5 Points Cafe".
+        const address = primary.match(/^(\d+[a-z]?(?:-\d+[a-z]?)?)\s+(.+)$/i);
+        const streetType = /\b(?:street|st\.?|road|rd\.?|avenue|ave\.?|boulevard|blvd\.?|drive|dr\.?|lane|ln\.?|highway|hwy\.?|route|rte\.?|parkway|pkwy\.?|way|court|ct\.?|circle|cir\.?|trail|trl\.?|place|pl\.?|terrace|ter\.?|loop|pike|turnpike|tpke\.?)\b/i;
+        return address && streetType.test(address[2]) ? address[2].trim() : primary;
+      };
 
       const kmlColor = (hex) => {
         const rgb = hex.slice(1);
