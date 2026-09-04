@@ -1007,7 +1007,7 @@
         const placemarks = segments.map((segment, index) => {
           const coordinates = segment.points.map(([lat, lon]) => `${lon},${lat},0`).join(" ");
           const route = `<Placemark><name>Segment ${index + 1}</name><Style><LineStyle><color>${kmlColor(segment.color)}</color><width>7</width></LineStyle></Style><LineString><tessellate>1</tessellate><coordinates>${coordinates}</coordinates></LineString></Placemark>`;
-          const stops = segment.stops.map((stop) => `<Placemark><name>${escapeXml(stop.name)}</name><Point><coordinates>${stop.lon},${stop.lat},0</coordinates></Point></Placemark>`).join("");
+          const stops = segment.stops.map((stop) => `<Placemark><name>${escapeXml(shortStopName(stop.name))}</name><description>${escapeXml(stop.name)}</description><Point><coordinates>${stop.lon},${stop.lat},0</coordinates></Point></Placemark>`).join("");
           return route + stops;
         }).join("");
         const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>My Trip</name>${placemarks}</Document></kml>`;
