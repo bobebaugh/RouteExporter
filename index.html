@@ -550,11 +550,16 @@
           points.push({ lat: latitude, lon: longitude });
         };
 
-        // Google Maps normally marks a named stop as !2m2 and a point created by
-        // dragging as !1m2. Both must be sent to Google Routes in this exact order.
+        // Google Maps normally marks a listed stop as !2m2 and a point created by
+        // dragging as !1m2. A !1m0 is a placeholder for a typed latitude/longitude
+        // waypoint that appears in the URL path but has no coordinate in the data block.
         const parsedUrl = new URL(url);
         const routeData = parsedUrl.searchParams.get("data") || url;
-        for (const match of routeData.matchAll(/!(2m2|1m2)!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)) {
+        for (const match of routeData.matchAll(/!(?:(2m2|1m2)!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)|(1m0))/g)) {
+          if (match[4]) {
+            points.push({ coordinateWaypointPlaceholder: true });
+            continue;
+          }
           const before = points.length;
           addPoint(match[3], match[2]);
           if (points.length > before) points.at(-1).isNamedStop = match[1] === "2m2";
@@ -562,25 +567,32 @@
 
         const path = parsedUrl.pathname;
         const match = path.match(/\/maps\/dir\/([^?]*)/);
-        const names = match
+        const pathStops = match
           ? match[1]
               .split("/")
               .filter((part) => part && !part.startsWith("@") && !part.startsWith("data="))
               .map((part) => {
-                try { return decodeURIComponent(part.replace(/\+/g, " ")); }
-                catch { return part; }
+                let name;
+                try { name = decodeURIComponent(part.replace(/\+/g, " ")); }
+                catch { name = part; }
+                const coordinate = name.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
+                return coordinate
+                  ? { name, lat: Number(coordinate[1]), lon: Number(coordinate[2]), isCoordinateWaypoint: true }
+                  : { name, isCoordinateWaypoint: false };
               })
           : [];
+        const names = pathStops.filter((stop) => !stop.isCoordinateWaypoint).map((stop) => stop.name);
+        const coordinateWaypoints = pathStops.filter((stop) => stop.isCoordinateWaypoint);
 
         // Google sometimes encodes a listed route stop (often a plain street address)
         // as !1m2. When the directions path lists more stops than !2m2 supplied,
         // promote only the missing coordinates in order. The remaining !1m2 points
         // are true unlabeled shapers.
-        let namedPointCount = points.filter((point) => point.isNamedStop).length;
-        const expectedNamedPointCount = Math.min(names.length, points.length);
+        let namedPointCount = points.filter((point) => point.isNamedStop || point.coordinateWaypointPlaceholder).length;
+        const expectedNamedPointCount = Math.min(pathStops.length, points.length);
         if (namedPointCount < expectedNamedPointCount) {
           for (const point of points) {
-            if (point.isNamedStop) continue;
+            if (point.isNamedStop || point.coordinateWaypointPlaceholder) continue;
             point.isNamedStop = true;
             namedPointCount += 1;
             if (namedPointCount === expectedNamedPointCount) break;
@@ -588,7 +600,14 @@
         }
 
         let namedIndex = 0;
-        const labelledPoints = points.map((point) => {
+        let coordinateWaypointIndex = 0;
+        const labelledPoints = points.flatMap((point) => {
+          if (point.coordinateWaypointPlaceholder) {
+            const waypoint = coordinateWaypoints[coordinateWaypointIndex++];
+            return waypoint
+              ? [{ lat: waypoint.lat, lon: waypoint.lon, isNamedStop: true, name: waypoint.name }]
+              : [];
+          }
           if (!point.isNamedStop) return point;
           const namedPoint = { ...point, name: names[namedIndex] || `Stop ${namedIndex + 1}` };
           namedIndex += 1;
@@ -597,7 +616,7 @@
         // The URL path is the authoritative list of requested endpoints. Google
         // occasionally exposes fewer corresponding !2m2 marker coordinates, so
         // keep it separately from the marker list used for routing and map labels.
-        return { points: labelledPoints, routeNames: names };
+        return { points: labelledPoints, routeNames: pathStops.map((stop) => stop.name) };
       };
 
       const escapeXml = (value) => String(value)
