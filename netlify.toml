@@ -2,8 +2,6 @@
   command = "npm run build"
   publish = "."
   functions = "netlify/functions"
-  # Skip production builds from main; allow the codex/pilot branch deploy.
-  ignore = "node -e \"process.exit(process.env.BRANCH === 'main' ? 0 : 1)\""
 
 [functions]
   node_bundler = "esbuild"

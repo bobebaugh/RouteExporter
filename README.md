@@ -1,6 +1,6 @@
 # Route Exporter
 
-Working deployment: `codex/pilot`. Production builds from `main` remain deliberately skipped by `netlify.toml`. Do not promote until the owner has tested the pilot.
+Production: `main` at https://rideplan.ebaugh.net. Pilot: `codex/pilot` at https://codex-pilot--routeexporter.netlify.app. Production and pilot use separate trip stores; promote tested changes only with owner approval.
 
 ## Trip workflow
 
