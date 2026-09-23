@@ -24,6 +24,7 @@ function updateControls(){
  $('shareTrip').disabled=busy||!saved||dirty;
  $('deleteTrip').disabled=busy||!saved;
  for(const id of ['newTrip','openTrip','tripMenu','importTrip','addButton','urlInput','avoidHighways','routeOpacity'])$(id).disabled=busy;
+ cards.forEach((card,i)=>{card.draggable=!busy;for(const action of ['edit','remove'])card.querySelector(`[data-${action}]`).disabled=busy;card.querySelector('[data-up]').disabled=busy||i===0;card.querySelector('[data-down]').disabled=busy||i===cards.length-1;});
  document.body.classList.toggle('pending',busy);
 }
 async function task(fn){if(busy)return;busy=true;updateControls();try{await fn();}catch(e){status(e.message||'Something went wrong.');}finally{busy=false;updateControls();}}
