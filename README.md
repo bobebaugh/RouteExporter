@@ -2,6 +2,11 @@
 
 Production: `main` at https://rideplan.ebaugh.net. Pilot: `codex/pilot` at https://codex-pilot--routeexporter.netlify.app. Production and pilot use separate trip stores; promote tested changes only with owner approval.
 
+## Guides
+
+- [Editable Word user guide with screenshots](docs/Route-Exporter-User-Guide.docx)
+- [AI cheat sheet for Claude ChatGPT and other assistants](docs/AI-QUICKSTART.md)
+
 ## Trip workflow
 
 The opening page lists saved trips. New / Open / Save / Save As, rename/notes and confirmed deletion are available to everyone. There is intentionally no login or ownership enforcement. Download KML is the portable personal backup; Import KML creates an unsaved local copy. Import never overwrites an online trip until the user explicitly saves it.
