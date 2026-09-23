@@ -11,7 +11,7 @@ let tile=tiles.standard.addTo(map);
 const routes=L.featureGroup().addTo(map),markers=L.featureGroup().addTo(map);
 let lines=[],cards=[];
 const status=message=>{$('status').textContent=message||'';};
-const discard=()=>!dirty||confirm('You have unsaved changes. Discard them? Download KML first if you want a backup.');
+const discard=async()=>!dirty||await confirmAction('You have unsaved changes. Discard them? Download KML first if you want a backup.');
 const markDirty=()=>{dirty=true;updateControls();};
 const slug=name=>name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'trip';
 const tripUrl=()=>`${location.origin}/?trip=${encodeURIComponent(saved.id)}&name=${slug(trip.title)}`;
@@ -49,7 +49,7 @@ function render(fit=false){
   card.addEventListener('click',e=>{if(e.target.closest('a,button'))return;selectLeg(i,false,true);});
   card.addEventListener('keydown',e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();selectLeg(i,false,true);}});
   card.querySelector('[data-edit]').onclick=async()=>{if(busy)return;const value=await edit('Edit leg',s.title,s.note,true,s);if(!value||busy)return;if(value.sourceUrl!==s.sourceUrl||value.avoidHighways!==s.avoidHighways){if(!value.sourceUrl){status('Keep the existing link, or provide a Google Maps link to recalculate.');return;}await task(async()=>{status('Recalculating this leg with Google…');trip.segments[i]={...await buildLeg(value.sourceUrl,value.avoidHighways,value.name,s.color),note:value.notes};markDirty();render();status('Leg recalculated. Save to update the stored trip.');});}else{s.title=value.name;s.note=value.notes;markDirty();render();}};
-  card.querySelector('[data-remove]').onclick=()=>{if(busy)return;if(!confirm(`Remove ${s.title} from this trip?`))return;trip.segments.splice(i,1);selected=-1;markDirty();render();};
+  card.querySelector('[data-remove]').onclick=async()=>{if(busy)return;if(!await confirmAction(`Remove ${s.title} from this trip?`))return;trip.segments.splice(i,1);selected=-1;markDirty();render();};
   const move=to=>{if(busy||to<0||to>=trip.segments.length)return;const [leg]=trip.segments.splice(i,1);trip.segments.splice(to,0,leg);selected=to;markDirty();render();};
   card.querySelector('[data-up]').onclick=()=>move(i-1);card.querySelector('[data-down]').onclick=()=>move(i+1);
   card.addEventListener('dragstart',e=>{if(busy){e.preventDefault();return;}dragged=i;e.dataTransfer.setData('text/plain',String(i));card.classList.add('dragging');});
@@ -62,11 +62,15 @@ function render(fit=false){
  const partial=trip.segments.some(s=>s.distance===null||s.duration===null);
  $('totalDistance').textContent=`${(trip.segments.reduce((n,s)=>n+(s.distance||0),0)/1609.344).toFixed(1)} mi`;
  $('totalDuration').textContent=formatDuration(trip.segments.reduce((n,s)=>n+(s.duration||0),0));
- $('segmentCount').textContent=`${trip.segments.length} legs${partial?' · totals exclude unknown values':''}`;
+ $('segmentCount').textContent=`${trip.segments.length} ${trip.segments.length===1?"leg":"legs"}${partial?' · totals exclude unknown values':''}`;
  selectLeg(selected);updateControls();if(fit)fitAll();
 }
 function fitAll(){if(routes.getBounds().isValid())map.fitBounds(routes.getBounds(),{padding:[40,40]});else map.setView([37,-82],5);}
 function adopt(next,record=null,changed=false){trip=next;saved=record;dirty=changed;selected=-1;render(true);$('avoidHighways').checked=trip.segments.length>0&&trip.segments.every(s=>s.avoidHighways);}
+function confirmAction(message){
+ const d=$('confirmDialog');$('confirmMessage').textContent=message;
+ return new Promise(resolve=>{let accepted=false;$('confirmYes').onclick=()=>{accepted=true;d.close();};d.addEventListener('close',()=>resolve(accepted),{once:true});d.showModal();});
+}
 function edit(heading,name,notes,showNotes=true,leg=null){
  $('legFields').hidden=!leg;$('editSource').value=leg?.sourceUrl||'';$('editAvoid').checked=!!leg?.avoidHighways;
  $('editHeading').textContent=heading;$('editName').value=name;$('editNotes').value=notes||'';$('notesLabel').hidden=!showNotes;
@@ -76,26 +80,26 @@ async function save(asNew=false){
  if(busy||!trip.segments.length)return;
  let candidate=trip;
  if(asNew||!saved){const value=await edit('Save As',trip.title==='Untitled trip'?'':trip.title,trip.notes);if(!value)return;candidate={...trip,title:value.name,notes:value.notes};}
- else if(!confirm(`Replace the shared version of “${trip.title}”? Anyone opening its link will see your changes.`))return;
+ else if(!await confirmAction(`Replace the shared version of “${trip.title}”? Anyone opening its link will see your changes.`))return;
  await task(async()=>{status('Saving…');const result=await storage.write(asNew?null:saved?.id,toKml(candidate),asNew?null:saved?.revision);trip=candidate;saved=result;dirty=false;history.replaceState(null,'',tripUrl());render();status('Saved. Download KML to keep a personal backup.');});
 }
 async function load(id){await task(async()=>{status('Opening saved trip…');const record=await storage.read(id);const next=fromKml(record.kml);adopt(next,record);history.replaceState(null,'',tripUrl());$('openDialog').close();status('Opened saved KML. No Google routing request was needed.');});}
 async function listTrips(){
  const container=$('savedList');container.textContent='Loading…';
  try{const {trips}=await storage.list();container.replaceChildren();if(!trips.length)container.textContent='No saved trips yet. Start a new trip or import KML.';
- for(const row of trips){const div=document.createElement('div');div.className='saved-row';const info=document.createElement('div');const title=document.createElement('strong');title.textContent=row.title;const small=document.createElement('small');small.textContent=`${row.legCount} legs · ${new Date(row.updatedAt).toLocaleString()}`;info.append(title,small);const button=document.createElement('button');button.textContent='Open';button.setAttribute('aria-label',`Open ${row.title}`);button.onclick=()=>{if(discard())load(row.id);};div.append(info,button);container.append(div);}
+ for(const row of trips){const div=document.createElement('div');div.className='saved-row';const info=document.createElement('div');const title=document.createElement('strong');title.textContent=row.title;const small=document.createElement('small');small.textContent=`${row.legCount} legs · ${new Date(row.updatedAt).toLocaleString()}`;info.append(title,small);const button=document.createElement('button');button.textContent='Open';button.setAttribute('aria-label',`Open ${row.title}`);button.onclick=async()=>{if(await discard())load(row.id);};div.append(info,button);container.append(div);}
  }catch(e){container.textContent=e.message;}
 }
-function newTrip(){if(busy||!discard())return;adopt(blank());history.replaceState(null,'','/');$('openDialog').close();status('Add routes, then Save As to name this trip.');}
+async function newTrip(){if(busy||!await discard())return;adopt(blank());history.replaceState(null,'','/');$('openDialog').close();status('Add routes, then Save As to name this trip.');}
 $('newTrip').onclick=newTrip;$('dialogNew').onclick=newTrip;
 $('openTrip').onclick=()=>{if(busy)return;$('openDialog').showModal();listTrips();};$('refreshTrips').onclick=listTrips;
 $('saveTrip').onclick=()=>save();$('saveAsTrip').onclick=()=>save(true);
 $('tripMenu').onclick=()=>$('menuDialog').showModal();
 $('renameTrip').onclick=async()=>{$('menuDialog').close();const value=await edit('Rename trip / notes',trip.title,trip.notes);if(!value)return;trip.title=value.name;trip.notes=value.notes;markDirty();render();status('Name and notes updated locally. Save to update the shared trip.');};
-$('deleteTrip').onclick=()=>{if(!saved||busy)return;if(!confirm(`Delete “${trip.title}” from online storage? This affects everyone. Download KML first if you need a backup.`))return;$('menuDialog').close();task(async()=>{await storage.delete(saved.id,saved.revision);saved=null;dirty=true;history.replaceState(null,'','/');status('Online trip deleted. Your open copy remains available to download or Save As.');});};
+$('deleteTrip').onclick=async()=>{if(!saved||busy)return;if(!await confirmAction(`Delete “${trip.title}” from online storage? This affects everyone. Download KML first if you need a backup.`))return;$('menuDialog').close();task(async()=>{await storage.delete(saved.id,saved.revision);saved=null;dirty=true;history.replaceState(null,'','/');status('Online trip deleted. Your open copy remains available to download or Save As.');});};
 $('shareTrip').onclick=()=>task(async()=>{await navigator.clipboard.writeText(tripUrl());status('Trip link copied.');});
 $('downloadTrip').onclick=()=>{try{const url=URL.createObjectURL(new Blob([toKml(trip)],{type:'application/vnd.google-earth.kml+xml'}));const a=document.createElement('a');a.href=url;a.download=`${slug(trip.title)}.kml`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('KML downloaded with route lines, notes, and Google Maps links.');}catch(e){status(e.message);}};
-$('importTrip').onclick=()=>{if(!busy&&discard())$('fileInput').click();};
+$('importTrip').onclick=async()=>{if(!busy&&await discard())$('fileInput').click();};
 $('fileInput').onchange=()=>{const file=$('fileInput').files[0];$('fileInput').value='';if(!file)return;task(async()=>{if(file.size>MAX_BYTES)throw new Error('KML must be smaller than 4 MB.');const next=fromKml(await file.text());adopt(next,null,true);history.replaceState(null,'','/');status('KML imported. Save As to add it to the online collection.');});};
 $('fitTrip').onclick=fitAll;
 $('routeOpacity').oninput=()=>{trip.opacity=Number($('routeOpacity').value)/100;$('opacityValue').textContent=`${$('routeOpacity').value}%`;selectLeg(selected);markDirty();};
