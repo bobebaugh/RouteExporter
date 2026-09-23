@@ -1,0 +1,106 @@
+{
+  "version": 2,
+  "title": "2027 New England \u00b7 Days 1\u201314",
+  "notes": "Working draft from Trip Book 1.0. Google Avoid highways is enabled for every day. City centers stand in for hotels. Driving times exclude breaks; the book\u2019s daylight targets are not yet validated. Return overnights and broad scenic corridors use provisional anchors.",
+  "mapStyle": "standard",
+  "segments": [
+    {
+      "title": "Day 1",
+      "note": "",
+      "color": "#f05a28",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=St.+Petersburg%2C+FL&destination=Savannah%2C+GA&travelmode=driving&avoid=highways"
+    },
+    {
+      "title": "Day 2",
+      "note": "",
+      "color": "#1684e8",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Savannah%2C+GA&destination=Asheville%2C+NC&travelmode=driving&avoid=highways&waypoints=Augusta%2C+GA%7CHartwell%2C+GA%7CAnderson%2C+SC%7CGreenville%2C+SC%7CHendersonville%2C+NC"
+    },
+    {
+      "title": "Day 3",
+      "note": "",
+      "color": "#a946d1",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Asheville%2C+NC&destination=Roanoke%2C+VA&travelmode=driving&avoid=highways&waypoints=Hot+Springs%2C+NC%7CGalax%2C+VA%7CHillsville%2C+VA"
+    },
+    {
+      "title": "Day 4",
+      "note": "Provisional corridor anchors: Lewisburg, Elkins and Williamsport.",
+      "color": "#d99b00",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Roanoke%2C+VA&destination=Binghamton%2C+NY&travelmode=driving&avoid=highways&waypoints=Lewisburg%2C+WV%7CElkins%2C+WV%7CWilliamsport%2C+PA"
+    },
+    {
+      "title": "Day 5",
+      "note": "Provisional Catskills / Vermont / northern New England anchors.",
+      "color": "#00a884",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Binghamton%2C+NY&destination=Bangor%2C+ME&travelmode=driving&avoid=highways&waypoints=Margaretville%2C+NY%7CBennington%2C+VT%7CManchester%2C+VT%7CRutland%2C+VT%7CLincoln%2C+NH"
+    },
+    {
+      "title": "Day 6",
+      "note": "",
+      "color": "#e34878",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Bangor%2C+ME&destination=Bangor%2C+ME&travelmode=driving&avoid=highways&waypoints=Machias%2C+ME%7CLubec%2C+ME%7CWest+Quoddy+Head+Lighthouse%2C+Lubec%2C+ME%7CEastport%2C+ME%7CCalais%2C+ME"
+    },
+    {
+      "title": "Day 7",
+      "note": "",
+      "color": "#f05a28",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Bangor%2C+ME&destination=Bangor%2C+ME&travelmode=driving&avoid=highways&waypoints=Greenville%2C+ME%7CRangeley%2C+ME%7CHeight+of+Land%2C+Maine+17%2C+Roxbury%2C+ME"
+    },
+    {
+      "title": "Day 8",
+      "note": "Provisional North Woods road loop; no park interior or unpaved-road detour selected.",
+      "color": "#1684e8",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Bangor%2C+ME&destination=Bangor%2C+ME&travelmode=driving&avoid=highways&waypoints=Millinocket%2C+ME%7CPatten%2C+ME%7CMount+Chase%2C+ME"
+    },
+    {
+      "title": "Day 9",
+      "note": "",
+      "color": "#a946d1",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Bangor%2C+ME&destination=Bangor%2C+ME&travelmode=driving&avoid=highways&waypoints=Lincoln%2C+NH%7CKancamagus+Pass%2C+NH%7CConway%2C+NH%7CCrawford+Notch%2C+NH%7CBethlehem%2C+NH%7CLittleton%2C+NH"
+    },
+    {
+      "title": "Day 10",
+      "note": "Provisional southern New Hampshire overnight: Concord.",
+      "color": "#d99b00",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Bangor%2C+ME&destination=Concord%2C+NH&travelmode=driving&avoid=highways&waypoints=Bethel%2C+ME%7CGorham%2C+NH%7CNorth+Conway%2C+NH"
+    },
+    {
+      "title": "Day 11",
+      "note": "Provisional eastern New York overnight: Albany.",
+      "color": "#00a884",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Concord%2C+NH&destination=Albany%2C+NY&travelmode=driving&avoid=highways&waypoints=Brattleboro%2C+VT%7CBennington%2C+VT%7CWilliamstown%2C+MA%7CPittsfield%2C+MA"
+    },
+    {
+      "title": "Day 12",
+      "note": "Provisional northern Pennsylvania anchors; Charleston WV retained from book.",
+      "color": "#e34878",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Albany%2C+NY&destination=Charleston%2C+WV&travelmode=driving&avoid=highways&waypoints=Scranton%2C+PA%7CWilliamsport%2C+PA"
+    },
+    {
+      "title": "Day 13",
+      "note": "",
+      "color": "#f05a28",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Charleston%2C+WV&destination=Charleston%2C+SC&travelmode=driving&avoid=highways"
+    },
+    {
+      "title": "Day 14",
+      "note": "",
+      "color": "#1684e8",
+      "avoidHighways": true,
+      "sourceUrl": "https://www.google.com/maps/dir/?api=1&origin=Charleston%2C+SC&destination=St.+Petersburg%2C+FL&travelmode=driving&avoid=highways&waypoints=Savannah%2C+GA"
+    }
+  ]
+}

@@ -431,6 +431,7 @@
       <h1>Route<br>Exporter</h1>
       <p class="intro">Paste Google Maps direction links, combine each route into one trip, then export the complete journey as KML. Listed waypoints are labeled; dragged points keep the route on course.</p>
 
+      <p id="tripNotes" class="intro" hidden></p>
       <div class="trip-heading">
         <h2>Trip segments</h2>
         <button class="text-button" id="clearButton" type="button" hidden>Clear all</button>
@@ -483,6 +484,8 @@
     window.addEventListener("DOMContentLoaded", () => {
       const MILES_PER_METER = 1 / 1609.344;
       const segments = [];
+      let tripTitle = "My Trip";
+      let tripNotes = "";
       const colors = ["#f05a28", "#1684e8", "#a946d1", "#d99b00", "#00a884", "#e34878"];
       let draggedSegmentIndex = null;
       const form = document.getElementById("routeForm");
@@ -554,6 +557,18 @@
         // dragging as !1m2. A !1m0 is a placeholder for a typed latitude/longitude
         // waypoint that appears in the URL path but has no coordinate in the data block.
         const parsedUrl = new URL(url);
+        if (parsedUrl.pathname.startsWith("/maps/dir") && parsedUrl.searchParams.get("api") === "1") {
+          const origin = parsedUrl.searchParams.get("origin");
+          const destination = parsedUrl.searchParams.get("destination");
+          const middle = parsedUrl.searchParams.get("waypoints");
+          if (!origin?.trim() || !destination?.trim()) throw new Error("The Google Maps link needs an origin and destination.");
+          const names = [origin, ...(middle ? middle.split("|") : []), destination];
+          if (names.some((name) => !name.trim())) throw new Error("The Google Maps link contains an empty waypoint.");
+          return {
+            points: names.map((name) => ({ address: name, name, isNamedStop: true })),
+            routeNames: names,
+          };
+        }
         const routeData = parsedUrl.searchParams.get("data") || url;
         for (const match of routeData.matchAll(/!(?:(2m2|1m2)!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)|(1m0))/g)) {
           if (match[4]) {
@@ -710,6 +725,15 @@
         return data;
       };
 
+      const locateStops = (stops, route) => stops.map((stop, index) => {
+        if (Number.isFinite(stop.lat) && Number.isFinite(stop.lon)) return stop;
+        const location = route.stopLocations?.[index];
+        if (!Number.isFinite(location?.lat) || !Number.isFinite(location?.lon)) {
+          throw new Error("Google did not locate every named stop.");
+        }
+        return { ...stop, ...location };
+      });
+
       const render = (fitMap = true) => {
         list.replaceChildren();
         layerGroup.clearLayers();
@@ -778,7 +802,7 @@
           ].filter(Boolean).join(" · ");
           item.innerHTML = `
             <i class="swatch" style="background:${segment.color}" aria-hidden="true"></i>
-            <div><strong title="From ${escapeXml(firstStopName)} to ${escapeXml(lastStopName)}">FROM ${escapeXml(firstStop)} TO ${escapeXml(lastStop)}</strong><span>${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
+            <div><strong title="From ${escapeXml(firstStopName)} to ${escapeXml(lastStopName)}">${escapeXml(segment.title || `FROM ${firstStop} TO ${lastStop}`)}</strong><span>${segment.title ? `${escapeXml(firstStop)} → ${escapeXml(lastStop)}<br>` : ""}${segment.note ? `${escapeXml(segment.note)}<br>` : ""}${details ? `${details}<br>` : ""}${(segment.distance * MILES_PER_METER).toFixed(1)} miles · ${formatDuration(segment.duration)}</span><br><a class="source-link" href="${escapeXml(segment.sourceUrl)}" target="_blank" rel="noopener">Open in Google Maps</a></div>
             <button class="remove" type="button" aria-label="Remove segment ${index + 1}" data-index="${index}">&times;</button>
           `;
           item.addEventListener("dragstart", (event) => {
@@ -864,7 +888,7 @@
             avoidHighways: avoidHighways.checked,
             encodedPolyline: route.encodedPolyline,
             points: routeGeometry,
-            stops,
+            stops: locateStops(stops, route),
             startName: parsedRoute.routeNames[0] || stops[0].name,
             endName: parsedRoute.routeNames.at(-1) || stops.at(-1).name,
             shapingPointCount: routePoints.length - stops.length,
@@ -927,9 +951,13 @@
         const center = map.getCenter();
         return {
           version: 2,
+          title: tripTitle,
+          notes: tripNotes,
           mapStyle: currentMapStyle,
           view: { lat: center.lat, lon: center.lng, zoom: map.getZoom() },
           segments: segments.map((segment) => ({
+            title: segment.title,
+            note: segment.note,
             color: segment.color,
             sourceUrl: segment.sourceUrl,
             avoidHighways: Boolean(segment.avoidHighways),
@@ -944,6 +972,7 @@
         try {
           const restored = [];
           for (const segment of trip.segments) {
+            setStatus(`Calculating ${segment.title || "route"} (${restored.length + 1} of ${trip.segments.length})…`);
             if (!/^#[0-9a-f]{6}$/i.test(segment?.color) || typeof segment.sourceUrl !== "string") throw new Error("This trip link contains an invalid route.");
             const sourceUrl = new URL(segment.sourceUrl);
             if (sourceUrl.protocol !== "https:" || !["google.com", "www.google.com", "maps.google.com", "goo.gl", "maps.app.goo.gl"].includes(sourceUrl.hostname)) {
@@ -960,18 +989,26 @@
             restored.push({
               distance: route.distanceMeters,
               duration: parseDuration(route.duration),
+              title: typeof segment.title === "string" ? segment.title.slice(0, 120) : "",
+              note: typeof segment.note === "string" ? segment.note.slice(0, 500) : "",
               color: segment.color,
               sourceUrl: sourceUrl.toString(),
               avoidHighways: Boolean(segment.avoidHighways),
               encodedPolyline: route.encodedPolyline,
               points,
-              stops,
+              stops: locateStops(stops, route),
               startName: parsedRoute.routeNames[0] || stops[0].name,
               endName: parsedRoute.routeNames.at(-1) || stops.at(-1).name,
               shapingPointCount: routePoints.length - stops.length,
             });
           }
           segments.push(...restored);
+          tripTitle = typeof trip.title === "string" ? trip.title.slice(0, 160) : "My Trip";
+          tripNotes = typeof trip.notes === "string" ? trip.notes.slice(0, 1500) : "";
+          document.title = `${tripTitle} — Route Exporter`;
+          document.querySelector(".trip-heading h2").textContent = tripTitle;
+          document.getElementById("tripNotes").textContent = tripNotes;
+          document.getElementById("tripNotes").hidden = !tripNotes;
           setMapStyle(trip.mapStyle);
           render(false);
           if (Number.isFinite(trip.view?.lat) && Number.isFinite(trip.view?.lon) && Number.isFinite(trip.view?.zoom)) {
@@ -1006,11 +1043,11 @@
       exportButton.addEventListener("click", () => {
         const placemarks = segments.map((segment, index) => {
           const coordinates = segment.points.map(([lat, lon]) => `${lon},${lat},0`).join(" ");
-          const route = `<Placemark><name>Segment ${index + 1}</name><Style><LineStyle><color>${kmlColor(segment.color)}</color><width>7</width></LineStyle></Style><LineString><tessellate>1</tessellate><coordinates>${coordinates}</coordinates></LineString></Placemark>`;
+          const route = `<Placemark><name>${escapeXml(segment.title || `Segment ${index + 1}`)}</name><description>${escapeXml(segment.note || "")}</description><Style><LineStyle><color>${kmlColor(segment.color)}</color><width>7</width></LineStyle></Style><LineString><tessellate>1</tessellate><coordinates>${coordinates}</coordinates></LineString></Placemark>`;
           const stops = segment.stops.map((stop) => `<Placemark><name>${escapeXml(shortStopName(stop.name))}</name><description>${escapeXml(stop.name)}</description><Point><coordinates>${stop.lon},${stop.lat},0</coordinates></Point></Placemark>`).join("");
           return route + stops;
         }).join("");
-        const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>My Trip</name>${placemarks}</Document></kml>`;
+        const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${escapeXml(tripTitle)}</name>${placemarks}</Document></kml>`;
         const blobUrl = URL.createObjectURL(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }));
         const link = document.createElement("a");
         link.href = blobUrl;
@@ -1020,10 +1057,16 @@
       });
 
       const sharedTrip = new URLSearchParams(location.hash.slice(1)).get("trip");
+      const preset = new URLSearchParams(location.search).get("trip");
       if (sharedTrip) {
         decodeTrip(sharedTrip).then(restoreTrip).catch((error) => {
           setStatus(error.message || "The shared trip link could not be opened.");
         });
+      } else if (preset === "new-england-2027") {
+        fetch("/trips/new-england-2027.json")
+          .then((response) => { if (!response.ok) throw new Error("The trip could not be loaded."); return response.json(); })
+          .then(restoreTrip)
+          .catch((error) => setStatus(error.message || "The trip could not be opened."));
       }
     });
   </script>

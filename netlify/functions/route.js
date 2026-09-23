@@ -7,6 +7,9 @@ const json = (statusCode, body) => ({
   body: JSON.stringify(body),
 });
 
+const isAddress = (point) => typeof point?.address === "string"
+  && point.address.trim().length > 0 && point.address.length <= 500;
+
 const isPoint = (point) => {
   const { lat, lon } = point || {};
   return Number.isFinite(lat)
@@ -15,8 +18,10 @@ const isPoint = (point) => {
     && Math.abs(lon) <= 180;
 };
 
-const waypoint = ({ lat, lon }, via = false) => ({
-  location: { latLng: { latitude: lat, longitude: lon } },
+const waypoint = (point, via = false) => ({
+  ...(isAddress(point)
+    ? { address: point.address.trim() }
+    : { location: { latLng: { latitude: point.lat, longitude: point.lon } } }),
   ...(via ? { via: true } : {}),
 });
 
@@ -40,7 +45,7 @@ exports.handler = async (event) => {
   }
 
   const points = request?.points;
-  if (!Array.isArray(points) || points.length < 2 || !points.every(isPoint)) {
+  if (!Array.isArray(points) || points.length < 2 || !points.every((point) => isPoint(point) || isAddress(point))) {
     return json(400, { error: "A route needs at least two valid map points." });
   }
   if (points.length > 27) {
@@ -66,7 +71,7 @@ exports.handler = async (event) => {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": process.env.GOOGLE_ROUTES_API_KEY,
-        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.legs.startLocation,routes.legs.endLocation",
       },
       body: JSON.stringify(body),
       ...(signal ? { signal } : {}),
@@ -89,7 +94,21 @@ exports.handler = async (event) => {
     return json(502, { error: "Google returned no usable route for these points." });
   }
 
+  const locations = route.legs?.length
+    ? [route.legs[0].startLocation, ...route.legs.map((leg) => leg.endLocation)]
+    : [];
+  const stopLocations = locations.map((location) => ({
+    lat: location?.latLng?.latitude,
+    lon: location?.latLng?.longitude,
+  }));
+  if (points.some(isAddress) && (stopLocations.length !== points.filter((point, index) =>
+    index === 0 || index === points.length - 1 || point.isNamedStop).length
+    || !stopLocations.every(isPoint))) {
+    return json(502, { error: "Google returned incomplete waypoint locations." });
+  }
+
   return json(200, {
+    stopLocations,
     distanceMeters: route.distanceMeters,
     duration: route.duration,
     encodedPolyline: route.polyline.encodedPolyline,
