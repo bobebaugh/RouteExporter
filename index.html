@@ -42,6 +42,7 @@
       display: grid;
       grid-template-columns: minmax(285px, 360px) 1fr;
       min-height: 100vh;
+      height: 100vh;
     }
 
     .sidebar {
@@ -408,7 +409,7 @@
     }
 
     @media (max-width: 760px) {
-      .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(62vh, 1fr); }
+      .app { height: auto; grid-template-columns: 1fr; grid-template-rows: auto minmax(62vh, 1fr); }
       .sidebar { padding: 20px; border-right: 0; border-bottom: 1px solid var(--line); }
       h1 { font-size: 2.2rem; }
       .intro { margin-bottom: 18px; }
@@ -1007,6 +1008,7 @@
           tripTitle = typeof trip.title === "string" ? trip.title.slice(0, 160) : "My Trip";
           tripNotes = typeof trip.notes === "string" ? trip.notes.slice(0, 1500) : "";
           document.title = `${tripTitle} — Route Exporter`;
+          document.querySelector(".sidebar > .intro").hidden = Boolean(tripNotes);
           document.querySelector(".trip-heading h2").textContent = tripTitle;
           document.getElementById("tripNotes").textContent = tripNotes;
           document.getElementById("tripNotes").hidden = !tripNotes;
