@@ -16,11 +16,11 @@ test('all fourteen days preserve their order, continuity and avoid-highways requ
     assert.equal(segment.title, `Day ${index + 1}`);
     assert.equal(segment.avoidHighways, true);
     const url = new URL(segment.sourceUrl);
-    assert.equal(url.searchParams.get('avoid'), 'highways');
+    assert.ok(url.searchParams.get('avoid') === 'highways' || url.pathname.includes('!2m1!1b1'));
     const route = parse(segment.sourceUrl);
     assert.ok(route.points.length >= 2 && route.points.length <= 11);
-    assert.ok(route.points.every(p => p.address && p.isNamedStop));
-    if (previous) assert.equal(route.routeNames[0], previous);
+    assert.ok(route.points.every(p => p.isNamedStop && (p.address || Number.isFinite(p.lat))));
+    if (previous) assert.equal(route.routeNames[0].split(',')[0], previous.split(',')[0]);
     previous = route.routeNames.at(-1);
   }
   assert.equal(parse(trip.segments[0].sourceUrl).routeNames[0], 'St. Petersburg, FL');

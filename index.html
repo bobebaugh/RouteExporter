@@ -983,7 +983,8 @@
             const routePoints = parsedRoute.points;
             const stops = routePoints.filter((point) => point.isNamedStop);
             if (routePoints.length < 2 || stops.length < 2) throw new Error("A route in this shared trip no longer contains usable Google Maps stops.");
-            const route = await calculateRoute(routePoints, Boolean(segment.avoidHighways));
+            const route = await calculateRoute(routePoints, Boolean(segment.avoidHighways))
+              .catch((error) => { throw new Error(`${segment.title || "Route"}: ${error.message}`); });
             const points = decodePolyline(route.encodedPolyline);
             if (points.length < 2) throw new Error("Google returned a route without usable map geometry.");
             restored.push({
