@@ -2,10 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const html = fs.readFileSync('index.html', 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-new vm.Script(script);
-const parser = html.slice(html.indexOf('      const parseRoutePoints'), html.indexOf('      const escapeXml'));
+const source = fs.readFileSync('app/routing.mjs', 'utf8');
+const parser = source.slice(source.indexOf('export const parseRoutePoints'), source.indexOf('export const escapeXml')).replace('export const', 'const');
 const parse = vm.runInNewContext(`${parser}; parseRoutePoints`, { URL });
 const trip = JSON.parse(fs.readFileSync('trips/new-england-2027.json'));
 
