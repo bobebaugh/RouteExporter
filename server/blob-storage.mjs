@@ -1,6 +1,7 @@
 import {getStore} from '@netlify/blobs';
-export function createStorage(context=process.env.CONTEXT,branch=process.env.BRANCH){
- const name=process.env.TRIP_STORE || (context==='production'?'route-trips-production':`route-trips-${branch||context||'development'}`);
+import {storeName} from './deployment.mjs';
+export function createStorage(){
+ const name=process.env.TRIP_STORE || storeName;
  const store=getStore({name,consistency:'strong'});
  const key=id=>`trips/${id}.kml`;
  return {

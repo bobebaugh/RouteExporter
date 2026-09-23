@@ -24,7 +24,7 @@ Opening, saving, renaming, downloading, importing, and sharing stored trips do n
 
 The storage adapter returns a revision token. Updates use conditional writes, so stale clients cannot silently replace a newer version. Deletion writes an empty conditional tombstone (not retained trip content) to prevent races with saves. Saved trip contents are raw KML, not a database JSON record; lightweight metadata supports listing without downloading all geometry.
 
-By default production uses `route-trips-production`. Branch builds use `route-trips-<branch>`; a `TRIP_STORE` environment variable can explicitly select a store. Keep production and pilot separate. Stores persist across deployments. No periodic jobs or background polling are used.
+By default production uses `route-trips-production`. The build script selects a separate, sanitized and hashed namespace for each branch; a `TRIP_STORE` environment variable can explicitly select a store. Keep production and pilot separate. Stores persist across deployments. No periodic jobs or background polling are used.
 
 ## Tests
 
