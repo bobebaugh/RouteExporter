@@ -1,0 +1,4 @@
+# Allow direct browser and assistant access, and crawling to read noindex.
+# Search exclusion is set by the X-Robots-Tag header and HTML robots meta tag.
+User-agent: *
+Allow: /

@@ -2,6 +2,10 @@
 
 Production: `main` at https://rideplan.ebaugh.net. Pilot: `codex/pilot` at https://codex-pilot--routeexporter.netlify.app. Production and pilot use separate trip stores; promote tested changes only with owner approval.
 
+## Search visibility
+
+The site sends `noindex, follow` through its HTML and static response headers; the trip API also sends the header. `robots.txt` allows crawling so search engines can read the directive and assistants can follow user-provided links. This requests exclusion from search results without authentication or crawler blocking; it is not access control.
+
 ## Guides
 
 - [Editable Word user guide with screenshots](docs/Route-Exporter-User-Guide.docx)

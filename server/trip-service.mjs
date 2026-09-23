@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {DOMParser} from '@xmldom/xmldom';
 import {fromKml,MAX_BYTES} from '../app/kml.mjs';
 import {authorize} from './access.mjs';
-const result=(status,data)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+const result=(status,data)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Robots-Tag':'noindex, follow'}});
 const validId=id=>/^[a-z0-9-]{1,80}$/.test(id||'');
 export async function handle(request,storage){
  try {
