@@ -40,3 +40,21 @@ By default production uses `route-trips-production`. The build script selects a 
 `npm ci && npm test`
 
 Checks cover KML fidelity, source links, third-party imports, malformed input, storage lifecycle and stale revisions, legacy Maps URL parsing, and address/numeric Google request behavior. Live pilot acceptance also checks storage connectivity, Save As/reopen, import/export, rename/delete, and route selection. Google key remains a server-side Netlify environment variable.
+
+## Picking this up
+
+There is no running thread to return to: this repo is the project's memory. A new session (Claude, Codex or
+another assistant) starts by reading this README and [docs/AI-QUICKSTART.md](docs/AI-QUICKSTART.md), then the
+recent commits. On Bob's PC, PC Setup's `routeexporter` recipe prepares the checkout. The work through 2026-09-23
+was done by Codex (the `codex/pilot` branch and pilot site).
+
+## Google cost controls to confirm (Bob, 2026-10-22)
+
+Adding a route or changing a leg's source link or avoid-highways setting calls Google's Routes API on Bob's
+billing account, and the site is public. Before more use, confirm:
+
+1. The `GOOGLE_ROUTES_API_KEY` key is restricted to the Routes API only (Google Cloud console, Credentials).
+2. A daily request quota is set on the Routes API (APIs & Services, Quotas). A quota stops calls; a billing
+   budget only sends alerts unless it is set up to stop billing.
+3. The routing function (`netlify/functions/route.js`) accepts requests only from the site's own pages (a
+   same-origin check), so the endpoint isn't usable from elsewhere.
