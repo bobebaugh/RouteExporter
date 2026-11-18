@@ -59,7 +59,8 @@ routes, so expand the links and look at start/end before deciding how legs group
   served by a function). No Google Static Maps (key exposure, per-image cost, caching terms). Bob tests
   the paste in Gmail on the pilot.
 
-- Folders, accounts, IP logging and the OneNote bulk import: designed, not started. See
+- Folders, accounts, IP logging and the OneNote bulk import: designed; phase 1 (folders and ride dates,
+  no accounts) is on the pilot awaiting Bob's check and the next batched promotion. See
   [docs/DESIGN.md](docs/DESIGN.md) for decisions and phases. The raw ride data is OneNote pages (a
   Tampa-area weekly section and a WNC Riders section, about 75 pages) with dated titles, notes, photos and
   `maps.app.goo.gl` leg links; no assistant tool reads OneNote, so Bob exports sections to Word (.docx).

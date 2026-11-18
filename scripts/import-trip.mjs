@@ -6,6 +6,7 @@
 //   { "version": 2, "title": "...", "notes": "...", "mapStyle": "standard",
 //     "segments": [ { "title": "Leg 1", "note": "", "avoidHighways": false, "sourceUrl": "https://maps.app.goo.gl/..." } ] }
 // Only title and each segment's sourceUrl are required; color defaults to the app's palette.
+// Optional "folder" ("Tampa Weekly/2026") and "rideDate" ("2026-03-27"; defaults to a date in the title).
 //
 // Each leg goes through the site's own routing and unshorten functions using app/routing.mjs
 // (one Google Routes call per leg, as with Add route), then app/kml.mjs builds the KML the app saves.
@@ -34,6 +35,7 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = (url, init) => realFetch(String(url).startsWith('/') ? base + url : url, init);
 const { buildLeg } = await import(pathToFileURL(resolve(repo, 'app/routing.mjs')).href);
 const { toKml, fromKml } = await import(pathToFileURL(resolve(repo, 'app/kml.mjs')).href);
+const { rideDateFromTitle } = await import(pathToFileURL(resolve(repo, 'app/organize.mjs')).href);
 const { DOMParser } = createRequire(resolve(repo, 'package.json'))('@xmldom/xmldom');
 const palette = ['#f05a28', '#1684e8', '#a946d1', '#d99b00', '#00a884', '#e34878']; // same as app/main.mjs
 
@@ -64,11 +66,13 @@ for (const [i, s] of recipe.segments.entries()) {
   console.log(`${leg.title}: ${(leg.distance / 1609.344).toFixed(1)} mi, ${Math.round(leg.duration / 60)} min, `
     + `${leg.stops.length} stops, ${leg.startName.split(',')[0]} -> ${leg.endName.split(',')[0]}`);
 }
-const trip = { title: recipe.title, notes: recipe.notes || '', mapStyle: recipe.mapStyle || 'standard', opacity: recipe.opacity ?? 0.5, segments };
+const trip = { title: recipe.title, notes: recipe.notes || '', mapStyle: recipe.mapStyle || 'standard', opacity: recipe.opacity ?? 0.5,
+  folder: recipe.folder || '', rideDate: recipe.rideDate ?? rideDateFromTitle(recipe.title), segments };
 const kml = toKml(trip);
 const expected = JSON.stringify(fromKml(kml, DOMParser)); // the validation the app applies when opening
 const miles = segments.reduce((sum, s) => sum + s.distance, 0) / 1609.344;
-console.log(`"${trip.title}": ${segments.length} legs, ${miles.toFixed(1)} mi, ${kml.length} bytes of KML`);
+console.log(`"${trip.title}": ${segments.length} legs, ${miles.toFixed(1)} mi, ${kml.length} bytes of KML`
+  + `, folder "${trip.folder || '(none)'}", ride date ${trip.rideDate || '(none)'}`);
 if (out) { writeFileSync(out, kml); console.log(`Wrote ${out}`); }
 
 if (!create) {

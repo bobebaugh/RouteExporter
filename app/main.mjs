@@ -2,9 +2,12 @@ import {storage} from './storage.mjs';
 import {toKml,fromKml,MAX_BYTES} from './kml.mjs';
 import {buildLeg,shortStopName,formatDuration,escapeXml} from './routing.mjs';
 import {renderMapImage,emailParts} from './email.mjs';
+import {normalizeFolder,validDate,rideDateFromTitle,buildTree,folderPaths,searchTrips} from './organize.mjs';
 const $=id=>document.getElementById(id);
 const palette=['#f05a28','#1684e8','#a946d1','#d99b00','#00a884','#e34878'];
-const blank=()=>({title:'Untitled trip',notes:'',mapStyle:'standard',opacity:.5,segments:[]});
+const blank=()=>({title:'Untitled trip',notes:'',mapStyle:'standard',opacity:.5,folder:'',rideDate:'',segments:[]});
+const formatDate=iso=>{const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});};
+let savedRows=[];const openFolders=new Set();
 let trip=blank(),saved=null,dirty=false,busy=false,selected=-1,dragged=null;
 const map=L.map('map').setView([37,-82],5);
 const tiles={standard:L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}),terrain:L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)',maxNativeZoom:17,maxZoom:19})};
@@ -21,6 +24,7 @@ function updateControls(){
  $('saveState').textContent=dirty?'Unsaved changes':saved?'Saved':'Not saved';
  document.title=`${dirty?'* ':''}${trip.title} — Route Exporter`;
  $('tripNotes').textContent=trip.notes;$('notesDetails').hidden=!trip.notes;
+ $('tripPlace').textContent=[trip.folder,trip.rideDate&&`Ride date ${formatDate(trip.rideDate)}`].filter(Boolean).join(' · ');$('tripPlace').hidden=!trip.folder&&!trip.rideDate;
  for(const id of ['saveTrip','saveAsTrip','downloadTrip','fitTrip','emailTrip'])$(id).disabled=busy||!trip.segments.length;
  $('shareTrip').disabled=busy||!saved||dirty;
  $('deleteTrip').disabled=busy||!saved;
@@ -73,31 +77,63 @@ function confirmAction(message){
  const d=$('confirmDialog');$('confirmMessage').textContent=message;
  return new Promise(resolve=>{let accepted=false;$('confirmYes').onclick=()=>{accepted=true;d.close();};d.addEventListener('close',()=>resolve(accepted),{once:true});d.showModal();});
 }
-function edit(heading,name,notes,showNotes=true,leg=null){
+// place: {folder, rideDate} shows the trip-level Folder and Ride date fields (Save As, trip details).
+function edit(heading,name,notes,showNotes=true,leg=null,place=null){
  $('legFields').hidden=!leg;$('editSource').value=leg?.sourceUrl||'';$('editAvoid').checked=!!leg?.avoidHighways;
  $('editHeading').textContent=heading;$('editName').value=name;$('editNotes').value=notes||'';$('notesLabel').hidden=!showNotes;
- return new Promise(resolve=>{const d=$('editDialog');let value=null;$('editForm').onsubmit=e=>{e.preventDefault();const name=$('editName').value.trim();if(!name){$('editName').focus();return;}value={name,notes:$('editNotes').value,...(leg?{sourceUrl:$('editSource').value.trim(),avoidHighways:$('editAvoid').checked}:{})};d.close();};d.addEventListener('close',()=>resolve(value),{once:true});d.showModal();$('editName').focus();});
+ $('tripFields').hidden=!place;
+ // Until a date is chosen, the ride date follows a date written in the name ("2026 MAR 27 - …").
+ let dateFollowsName=!!place&&!place.rideDate;
+ if(place){$('editFolder').value=place.folder||'';$('editRideDate').value=place.rideDate||rideDateFromTitle(name);refreshFolderOptions();}
+ $('editName').oninput=()=>{if(dateFollowsName)$('editRideDate').value=rideDateFromTitle($('editName').value);};
+ $('editRideDate').oninput=()=>{dateFollowsName=false;};
+ return new Promise(resolve=>{const d=$('editDialog');let value=null;$('editForm').onsubmit=e=>{e.preventDefault();const name=$('editName').value.trim();if(!name){$('editName').focus();return;}value={name,notes:$('editNotes').value,...(leg?{sourceUrl:$('editSource').value.trim(),avoidHighways:$('editAvoid').checked}:{}),...(place?{folder:normalizeFolder($('editFolder').value),rideDate:validDate($('editRideDate').value)}:{})};d.close();};d.addEventListener('close',()=>resolve(value),{once:true});d.showModal();$('editName').focus();});
+}
+function refreshFolderOptions(){
+ const fill=()=>$('folderOptions').replaceChildren(...folderPaths(savedRows).map(path=>Object.assign(document.createElement('option'),{value:path})));
+ fill();if(!savedRows.length)storage.list().then(({trips})=>{savedRows=trips;fill();}).catch(()=>{});
 }
 async function save(asNew=false){
  if(busy||!trip.segments.length)return;
  let candidate=trip;
- if(asNew||!saved){const value=await edit('Save As',trip.title==='Untitled trip'?'':trip.title,trip.notes);if(!value)return;candidate={...trip,title:value.name,notes:value.notes};}
+ if(asNew||!saved){const value=await edit('Save As',trip.title==='Untitled trip'?'':trip.title,trip.notes,true,null,trip);if(!value)return;candidate={...trip,title:value.name,notes:value.notes,folder:value.folder,rideDate:value.rideDate};}
  else if(!await confirmAction(`Replace the shared version of “${trip.title}”? Anyone opening its link will see your changes.`))return;
- await task(async()=>{status('Saving…');const result=await storage.write(asNew?null:saved?.id,toKml(candidate),asNew?null:saved?.revision);trip=candidate;saved=result;dirty=false;history.replaceState(null,'',tripUrl());render();status('Saved. Download KML to keep a personal backup.');});
+ await task(async()=>{status('Saving…');const result=await storage.write(asNew?null:saved?.id,toKml(candidate),asNew?null:saved?.revision);trip=candidate;saved=result;dirty=false;savedRows=[];history.replaceState(null,'',tripUrl());render();status('Saved. Download KML to keep a personal backup.');});
 }
 async function load(id){await task(async()=>{status('Opening saved trip…');const record=await storage.read(id);const next=fromKml(record.kml);adopt(next,record);history.replaceState(null,'',tripUrl());$('openDialog').close();status('Opened saved KML. No Google routing request was needed.');});}
+function tripRow(row,showFolder=false){
+ const div=document.createElement('div');div.className='saved-row';const info=document.createElement('div');const title=document.createElement('strong');title.textContent=row.title;
+ const small=document.createElement('small');
+ small.textContent=[validDate(row.rideDate)&&formatDate(row.rideDate),`${row.legCount} ${row.legCount===1?'leg':'legs'}`,Number.isFinite(row.distanceMeters)&&`${Math.round(row.distanceMeters/1609.344)} mi`,Number.isFinite(row.durationSeconds)&&formatDuration(row.durationSeconds),showFolder&&(row.folder||'Not in a folder'),`saved ${new Date(row.updatedAt).toLocaleDateString()}`].filter(Boolean).join(' · ');
+ info.append(title,small);const button=document.createElement('button');button.textContent='Open';button.setAttribute('aria-label',`Open ${row.title}`);button.onclick=async()=>{if(await discard())load(row.id);};div.append(info,button);return div;
+}
+function folderNode(node){
+ const key=node.path.toLowerCase();const details=document.createElement('details');details.className='folder';details.open=openFolders.has(key);
+ details.ontoggle=()=>{if(details.open)openFolders.add(key);else openFolders.delete(key);};
+ const summary=document.createElement('summary');summary.textContent=`${node.name} (${node.count})`;const body=document.createElement('div');body.className='folder-body';
+ body.append(...node.folders.map(folderNode),...node.trips.map(row=>tripRow(row)));details.append(summary,body);return details;
+}
+function renderList(){
+ const container=$('savedList');container.replaceChildren();const query=$('tripSearch').value.trim();
+ if(!savedRows.length){container.textContent='No saved trips yet. Start a new trip or import KML.';return;}
+ if(query){const hits=searchTrips(savedRows,query);if(!hits.length)container.textContent='No saved trips match.';container.append(...hits.map(row=>tripRow(row,true)));return;}
+ const tree=buildTree(savedRows);container.append(...tree.folders.map(folderNode));
+ if(tree.folders.length&&tree.trips.length){const label=document.createElement('p');label.className='folder-label';label.textContent=`Not in a folder (${tree.trips.length})`;container.append(label);}
+ container.append(...tree.trips.map(row=>tripRow(row)));
+}
 async function listTrips(){
  const container=$('savedList');container.textContent='Loading…';
- try{const {trips}=await storage.list();container.replaceChildren();if(!trips.length)container.textContent='No saved trips yet. Start a new trip or import KML.';
- for(const row of trips){const div=document.createElement('div');div.className='saved-row';const info=document.createElement('div');const title=document.createElement('strong');title.textContent=row.title;const small=document.createElement('small');small.textContent=`${row.legCount} legs · ${new Date(row.updatedAt).toLocaleString()}`;info.append(title,small);const button=document.createElement('button');button.textContent='Open';button.setAttribute('aria-label',`Open ${row.title}`);button.onclick=async()=>{if(await discard())load(row.id);};div.append(info,button);container.append(div);}
- }catch(e){container.textContent=e.message;}
+ // Open the folders leading to the trip that's open now.
+ normalizeFolder(trip.folder).split('/').filter(Boolean).forEach((_,i,parts)=>openFolders.add(parts.slice(0,i+1).join('/').toLowerCase()));
+ try{const {trips}=await storage.list();savedRows=trips;renderList();}catch(e){container.textContent=e.message;}
 }
+$('tripSearch').oninput=renderList;
 async function newTrip(){if(busy||!await discard())return;adopt(blank());history.replaceState(null,'','/');$('openDialog').close();status('Add routes, then Save As to name this trip.');}
 $('newTrip').onclick=newTrip;$('dialogNew').onclick=newTrip;
 $('openTrip').onclick=()=>{if(busy)return;$('openDialog').showModal();listTrips();};$('refreshTrips').onclick=listTrips;
 $('saveTrip').onclick=()=>save();$('saveAsTrip').onclick=()=>save(true);
 $('tripMenu').onclick=()=>$('menuDialog').showModal();
-$('renameTrip').onclick=async()=>{$('menuDialog').close();const value=await edit('Rename trip / notes',trip.title,trip.notes);if(!value)return;trip.title=value.name;trip.notes=value.notes;markDirty();render();status('Name and notes updated locally. Save to update the shared trip.');};
+$('renameTrip').onclick=async()=>{$('menuDialog').close();const value=await edit('Trip details',trip.title,trip.notes,true,null,trip);if(!value)return;Object.assign(trip,{title:value.name,notes:value.notes,folder:value.folder,rideDate:value.rideDate});markDirty();render();status('Trip details updated locally. Save to update the shared trip.');};
 $('deleteTrip').onclick=async()=>{if(!saved||busy)return;if(!await confirmAction(`Delete “${trip.title}” from online storage? This affects everyone. Download KML first if you need a backup.`))return;$('menuDialog').close();task(async()=>{await storage.delete(saved.id,saved.revision);saved=null;dirty=true;history.replaceState(null,'','/');status('Online trip deleted. Your open copy remains available to download or Save As.');});};
 $('shareTrip').onclick=()=>task(async()=>{await navigator.clipboard.writeText(tripUrl());status('Trip link copied.');});
 // Copy for email. The clipboard write must start inside the click, so it gets promises that resolve once

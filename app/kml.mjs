@@ -1,4 +1,5 @@
 // Portable file format. No storage provider or routing service calls in this module.
+import { normalizeFolder, validDate } from './organize.mjs';
 export const MAX_BYTES = 4 * 1024 * 1024;
 const NS = 'http://www.opengis.net/kml/2.2';
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
@@ -27,11 +28,14 @@ export function validateTrip(trip) {
   return {title:String(s.title||`Leg ${i+1}`).slice(0,120),note:String(s.note||'').slice(0,3000),color:/^#[a-f\d]{6}$/i.test(s.color)?s.color:'#f05a28',sourceUrl:safeLink(s.sourceUrl),avoidHighways:s.avoidHighways===true,points:s.points,stops:stops.map(p=>({lat:p.lat,lon:p.lon,name:p.name.slice(0,1000)})),distance:Number.isFinite(s.distance)&&s.distance>=0?s.distance:null,duration:Number.isFinite(s.duration)&&s.duration>=0?s.duration:null,startName:String(s.startName||stops[0]?.name||'').slice(0,1000),endName:String(s.endName||stops.at(-1)?.name||'').slice(0,1000),shapingPointCount:Number.isInteger(s.shapingPointCount)&&s.shapingPointCount>=0?s.shapingPointCount:0};
  });
  if(count>250000) throw new Error('Trip has too many coordinates.');
- return {title:trip.title.trim(),notes:String(trip.notes||'').slice(0,3000),mapStyle:trip.mapStyle==='terrain'?'terrain':'standard',opacity:Number.isFinite(trip.opacity)?Math.max(.15,Math.min(.9,trip.opacity)):.5,segments};
+ return {title:trip.title.trim(),notes:String(trip.notes||'').slice(0,3000),mapStyle:trip.mapStyle==='terrain'?'terrain':'standard',opacity:Number.isFinite(trip.opacity)?Math.max(.15,Math.min(.9,trip.opacity)):.5,folder:normalizeFolder(trip.folder),rideDate:validDate(trip.rideDate),segments};
 }
 export function toKml(input) {
  const trip=validateTrip(input);
  const {segments,...meta}=trip;
+ // Leave empty organization fields out, so trips saved before folders existed keep identical KML.
+ if(!meta.folder)delete meta.folder;
+ if(!meta.rideDate)delete meta.rideDate;
  const folders=segments.map(s=>{
   const {points,...leg}=s;
   const rgb=s.color.slice(1);const color=`80${rgb.slice(4)}${rgb.slice(2,4)}${rgb.slice(0,2)}`;

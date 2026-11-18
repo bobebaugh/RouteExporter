@@ -121,9 +121,11 @@ All decisions go through `server/access.mjs` (already the intended hook).
 
 ## Build phases
 
-1. **Folders without accounts**: `folder`, `rideDate`, `createdAt`, distance/duration in metadata; folder tree,
-   search and ride-date sorting in Saved trips; Folder and Ride date in Save As / Rename; import script
-   fields. Existing trips land in Unfiled. Bob can organize his rides in Unfiled folders right away.
+1. **Folders without accounts** (built, on the pilot since 2026-11-18; code in `app/organize.mjs`):
+   `folder`, `rideDate`, `createdAt`, distance/duration in metadata; folder tree, search and ride-date
+   sorting in Saved trips; Folder and Ride date in Save As / trip details (date prefilled from a date in the
+   name); import script fields. Existing trips land in Unfiled and keep identical KML until given a folder or
+   date; their list rows show miles and time after their next save.
 2. **Logging and switches**: IP log, `settings/config.json`, quota counting and bypass token, all switched
    off except logging.
 3. **Accounts and spaces**: Google sign-in, users, spaces, admin role, permissions, read-only view, Copy to my

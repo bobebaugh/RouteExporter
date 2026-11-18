@@ -23,7 +23,11 @@ export async function handle(request,storage){
   let trip;try{trip=fromKml(body.kml,DOMParser);}catch(e){return result(400,{error:e.message});}
   if(!trip.segments.length)return result(400,{error:'Add at least one route before saving.'});
   if(method==='POST'&&body.id&&!validId(body.id))return result(400,{error:'Invalid trip ID.'});
-  const key=id||body.id||randomUUID();const metadata={title:trip.title,updatedAt:new Date().toISOString(),legCount:trip.segments.length};
+  const key=id||body.id||randomUUID();const now=new Date().toISOString();
+  // createdAt survives saves; trips saved before it existed take their last save time.
+  let createdAt=now;if(method==='PUT'){const existing=await (storage.meta?storage.meta(key):storage.read(key));if(existing)createdAt=existing.createdAt||existing.updatedAt||now;}
+  const total=field=>trip.segments.every(s=>Number.isFinite(s[field]))?trip.segments.reduce((n,s)=>n+s[field],0):null;
+  const metadata={title:trip.title,updatedAt:now,legCount:trip.segments.length,createdAt,folder:trip.folder,rideDate:trip.rideDate,distanceMeters:total('distance'),durationSeconds:total('duration')};
   const saved=await storage.write(key,body.kml,metadata,method==='POST'?null:body.revision);
   return saved?result(method==='POST'?201:200,saved):result(409,{error:'Someone changed or deleted this trip. Use Save As to preserve your version, or reopen it.'});
  }catch(e){console.error('Trip storage:',e.message);return result(503,{error:'Trip storage is unavailable. Your work is still here; Download KML to keep a copy.'});}

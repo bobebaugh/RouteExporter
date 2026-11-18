@@ -34,7 +34,7 @@ Browser access varies by assistant and account. Do not assume you can control th
 3. Prepare a working table: `Day | Start | Ordered stops | Finish | Maps link | Notes`. Check that each day's finish connects to the next day's start unless a transfer is intentional.
 4. For each day or loop, prepare a Google Maps **driving directions** link. An ordinary place pin or map viewport is not a route. Use intermediate towns or actual stops to express intended corridors; do not assume “scenic route” determines a particular road.
 5. Add each route to the app, then inspect the calculated line, endpoints, distance, and time. The routing API can choose a different path from the route displayed in Google Maps. Never guarantee that a shared URL reproduces a manually dragged route exactly.
-6. Label legs consistently, such as **Day 1**, and put assumptions, highlights, overnight information, and unresolved choices in Notes. Trip menu → Rename / notes holds overall trip notes.
+6. Label legs consistently, such as **Day 1**, and put assumptions, highlights, overnight information, and unresolved choices in Notes. Trip menu → Name, folder, date, notes holds overall trip notes.
 7. Flag implausibly long days. Driving time excludes breaks and overnight stops. Imported unknown distances and times are excluded from totals; do not interpret those totals as complete.
 
 Example directions URL structure (URL-encode each location and preserve waypoint order):
@@ -55,7 +55,7 @@ Use fresh page observations and accessible labels rather than fixed screen coord
 2. Fill **Google Maps directions link** and set **Avoid highways** explicitly for this route. Click **Add route** once.
 3. Wait for the new leg card and route line. Inspect them, then use that card's **Edit** button to set its Name and Notes. Click **Continue**.
 4. Repeat in the intended order. The arrows or drag-and-drop reorder cards; they do **not** renumber titles automatically.
-5. Click **Save As**, enter the trip Name and Notes, and **Continue**. Wait for **Saved**.
+5. Click **Save As**, enter the trip Name, Folder (pick an existing one or type a path such as `Tampa Weekly/2026`; blank = not in a folder), Ride date (filled in from a date in the name) and Notes, and **Continue**. Wait for **Saved**.
 6. Click **Copy Link** and capture the clipboard text with your supported tools. Download the KML to a real file and make it available to the user.
 7. Reopen the copied link and verify the saved result. Report any assumptions or legs still needing review.
 
@@ -66,7 +66,8 @@ Use fresh page observations and accessible labels rather than fixed screen coord
 - In **Edit leg**, changing Name or Notes keeps the existing geometry. Changing the Google Maps link or Avoid highways recalculates that leg with Google.
 - The checkbox above the map affects newly added routes; it does not change all saved legs.
 - **Save** on an existing trip asks to replace its shared version. Confirm only when that update is within the user's request.
-- **Trip menu → Rename / notes** changes the open copy. Follow with Save. A rename keeps its existing link valid.
+- **Trip menu → Name, folder, date, notes** changes the open copy, including moving it to another folder. Follow with Save. The trip keeps its link.
+- **Saved trips** groups trips into folders, newest ride first, with a search box for names and folders.
 - **Remove** removes one leg from the open copy. Save commits the removal online.
 
 ### Inspect the map
