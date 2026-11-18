@@ -29,7 +29,9 @@ test('email HTML has the map image, escaped text and clickable Google Maps links
   assert.ok(!html.includes('Stops: Start Diner'));
   assert.ok(html.includes('distance unknown'));
   assert.ok(html.includes('totals exclude unknown values'));
-  assert.ok(html.includes('<a href="https://rideplan.ebaugh.net/?trip=t1&amp;name=smoke">'));
+  assert.ok(html.includes('<b>Online route map:</b> <a href="https://rideplan.ebaugh.net/?trip=t1&amp;name=smoke">Open this ride in Route Exporter</a>'));
+  assert.ok(html.indexOf('Online route map') < html.indexOf('Line one') && html.indexOf('Online route map') > html.indexOf('Mirrors'), 'boxed link sits right under the title');
+  assert.match(html, /<table[^>]*><tr><td style="border:1px solid/);
   assert.ok(html.includes('color:#f05a28'));
 });
 
@@ -63,7 +65,8 @@ test('leg photos go at the end, headed with leg, destination and caption; none w
   assert.ok(html.includes('Leg 2 - Home</p>'), 'no caption, no trailing dash');
   assert.ok(html.includes('<img src="data:image/jpeg;base64,BBBB" width="600" height="450"'), 'wide photos display at 600 px');
   assert.ok(html.includes('width="400" height="300"'), 'small photos keep their size');
-  assert.ok(html.indexOf('BBBB') > html.indexOf('Whole ride in Route Exporter'), 'photos come after everything else');
+  assert.ok(html.indexOf('BBBB') > html.lastIndexOf('Google Maps:'), 'photos come after the legs');
+  assert.ok(text.startsWith('Smoke & "Mirrors" <Ride>\nOnline route map: https://rideplan.ebaugh.net/?trip=t1\n'));
   assert.ok(text.endsWith('Photo: Leg 1 - Lunch Spot - Brisket & beans\nPhoto: Leg 2 - Home'));
   assert.ok(!emailParts(trip, { image }).html.includes('base64,BBBB'));
 });

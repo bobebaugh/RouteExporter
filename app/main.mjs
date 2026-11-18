@@ -167,9 +167,11 @@ async function copyRich(parts){
  const copied=document.execCommand('copy');selection.removeAllRanges();holder.remove();
  if(!copied)throw new Error('The browser blocked copying. Click Copy for email again.');
 }
-$('emailTrip').onclick=()=>{if(busy||!trip.segments.length)return;const snapshot=structuredClone(trip);const link=saved&&!dirty?tripUrl():null;
+// The online link is included whenever the trip has been saved; it opens the saved version, so unsaved
+// edits get a reminder to Save.
+$('emailTrip').onclick=()=>{if(busy||!trip.segments.length)return;const snapshot=structuredClone(trip);const link=saved?tripUrl():null;const pending=dirty;
  const parts=renderMapImage(snapshot).then(image=>emailParts(snapshot,{image,link}));
- task(async()=>{status('Drawing the map for email…');await copyRich(parts);status(link?'Copied for email. Paste into a Gmail draft.':'Copied for email (no trip link until it is saved). Paste into a Gmail draft.');});};
+ task(async()=>{status('Drawing the map for email…');await copyRich(parts);status(!link?'Copied for email, without an online link (Save As first to get one). Paste into a Gmail draft.':pending?'Copied for email. Save too: the online link opens the saved version, which lacks your unsaved changes.':'Copied for email. Paste into a Gmail draft.');});};
 $('downloadTrip').onclick=()=>{try{const url=URL.createObjectURL(new Blob([toKml(trip)],{type:'application/vnd.google-earth.kml+xml'}));const a=document.createElement('a');a.href=url;a.download=`${slug(trip.title)}.kml`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('KML downloaded with route lines, notes, and Google Maps links.');}catch(e){status(e.message);}};
 $('importTrip').onclick=async()=>{if(!busy&&await discard())$('fileInput').click();};
 $('fileInput').onchange=()=>{const file=$('fileInput').files[0];$('fileInput').value='';if(!file)return;task(async()=>{if(file.size>MAX_BYTES)throw new Error('KML must be smaller than 4 MB.');const next=fromKml(await file.text());adopt(next,null,true);history.replaceState(null,'','/');status('KML imported. Save As to add it to the online collection.');});};

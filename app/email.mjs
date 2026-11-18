@@ -119,7 +119,13 @@ export function emailParts(trip, { image = null, link = null } = {}) {
   const photoTitle = s => [s.title, s.endName && shortStopName(s.endName), s.photoCaption].filter(Boolean).join(' - ');
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#202124">',
-    `<p style="margin:0 0 4px;font-size:20px;font-weight:bold">${esc(trip.title)}</p>`,
+    `<p style="margin:0 0 8px;font-size:20px;font-weight:bold">${esc(trip.title)}</p>`,
+    // The saved trip's online link, boxed so it reads as "this ride on the web". A table keeps the box
+    // when pasted into Gmail and other mail editors.
+    link ? '<table cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:0 0 10px"><tr>'
+      + '<td style="border:1px solid #1a73e8;background:#e8f0fe;border-radius:6px;padding:8px 12px;font-size:14px">'
+      + `<b>Online route map:</b> <a href="${esc(link)}">Open this ride in Route Exporter</a>`
+      + `<br><a href="${esc(link)}" style="color:#5f6368;font-size:12px">${esc(link)}</a></td></tr></table>` : '',
     trip.notes ? `<p style="margin:0 0 4px">${esc(trip.notes).replace(/\r?\n/g, '<br>')}</p>` : '',
     `<p style="margin:0 0 10px;color:#5f6368">${esc(summary)}</p>`,
     image ? `<p style="margin:0 0 12px"><img src="${image.src}" width="${image.width}" height="${image.height}" alt="${esc(`Route map: ${trip.title}`)}" style="max-width:100%;height:auto"></p>` : '',
@@ -132,7 +138,6 @@ export function emailParts(trip, { image = null, link = null } = {}) {
         + (s.sourceUrl ? `<br>Google Maps: <a href="${esc(s.sourceUrl)}">${esc(s.sourceUrl)}</a>` : '')
         + '</p>';
     }),
-    link ? `<p style="margin:12px 0 0">Whole ride in Route Exporter: <a href="${esc(link)}">${esc(trip.title)}</a></p>` : '',
     ...photos.map(s => {
       const width = Math.min(600, s.photo.width), height = Math.round(s.photo.height * width / s.photo.width);
       return `<p style="margin:18px 0 6px;font-weight:bold">${esc(photoTitle(s))}</p>`
@@ -142,13 +147,12 @@ export function emailParts(trip, { image = null, link = null } = {}) {
   ].join('');
 
   // '' is a blank separator line; null is an absent line.
-  const lines = [trip.title, trip.notes || null, summary];
+  const lines = [trip.title, link ? `Online route map: ${link}` : null, trip.notes || null, summary];
   for (const s of legs) {
     const { ends, size, stops } = legLine(s);
     lines.push('', `${s.title}${ends ? `: ${ends}` : ''} · ${size}`, s.note || null,
       stops.length ? `Stops: ${stops.join(', ')}` : null, s.sourceUrl ? `Google Maps: ${s.sourceUrl}` : null);
   }
-  if (link) lines.push('', `Whole ride in Route Exporter: ${link}`);
   if (photos.length) lines.push('', ...photos.map(s => `Photo: ${photoTitle(s)}`));
   const text = lines.filter(line => line !== null).join('\n');
 

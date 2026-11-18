@@ -84,7 +84,7 @@ Use fresh page observations and accessible labels rather than fixed screen coord
 
 ### Share a ride by email *(pilot)*
 
-**Copy for email** (below Copy Link) copies the open trip, including unsaved edits, as formatted text with one map image of all legs. Paste it into an email draft (tested in Gmail): title, notes, totals, the map, then per leg its color mark, start → end, miles, time, intermediate stops and a clickable Google Maps link, then a link to the whole ride when the trip is saved without pending edits, then each leg photo headed `Leg 2 - <destination> - <caption>`. The map is drawn in the browser from the same map tiles (no Google call). Clipboard access needs a real click in a current browser; an automation tool that cannot read the clipboard should tell the user to click the button and paste.
+**Copy for email** (below Copy Link) copies the open trip, including unsaved edits, as formatted text with one map image of all legs. Paste it into an email draft (tested in Gmail): title; for a saved trip, a blue box "Online route map: Open this ride in Route Exporter" with its link (the link opens the saved version, so Save first if there are unsaved edits; the app reminds); notes, totals, the map; per leg its color mark, start → end, miles, time, intermediate stops and a clickable Google Maps link; then each leg photo headed `Leg 2 - <destination> - <caption>`. Each copy reflects the trip it was made from: an older email's link opens that older trip, not a later copy. The map is drawn in the browser from the same map tiles (no Google call). Clipboard access needs a real click in a current browser; an automation tool that cannot read the clipboard should tell the user to click the button and paste.
 
 ## Backup and recovery
 
