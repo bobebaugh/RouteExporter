@@ -26,8 +26,12 @@ routes, so expand the links and look at start/end before deciding how legs group
 
 - `main` deploys production through Netlify on every push. Put `[skip netlify]` in the commit message
   for docs-only changes. `codex/pilot` deploys the pilot site, which has its own trip store.
-- Small, tested fixes can go to `main`. Larger or riskier changes go to the pilot first; promote to
-  production only with Bob's approval.
+- Changes go to the pilot first; promote to production only with Bob's approval. Each production deploy
+  uses Netlify deploy credits, so Bob batches promotions to `main` unless something is broken. Ask before
+  pushing to `main`, and use `[skip netlify]` for docs-only pushes anywhere.
+- Pilot and production have separate trip stores (`scripts/build.mjs`): a trip saved on one doesn't
+  exist on the other. To use a pilot-only feature on a production trip, Download KML in production and
+  Import KML on the pilot; the open copy works without saving it there.
 - Run `npm ci` once, then `npm test` before committing.
 - `npm run build` rewrites `server/deployment.mjs` with a generated store name. Never commit that
   change; restore it with `git checkout -- server/deployment.mjs`.
@@ -38,9 +42,9 @@ routes, so expand the links and look at start/end before deciding how legs group
 
 ## Open items
 
-- "Copy for email": built in `app/email.mjs` and on the pilot since 2026-11-18, waiting for Bob's Gmail
-  paste test before production. Not yet seen: the drawn map image itself (no canvas outside a browser
-  here). One click copies the shown trip, and one
+- "Copy for email": built in `app/email.mjs`, on the pilot since 2026-11-18. Bob's Gmail paste test
+  passed (map and clickable links came through). Waiting for the next batched promotion to production;
+  minor polish later: some waypoint labels crowd each other. One click copies the shown trip, and one
   paste into a Gmail draft gives the map image plus title, notes, legs (distance, time, start/end, stops,
   Google Maps links) and the trip link. Evidence (2026-11-18): Bob's OneNote copy → Gmail paste works.
   OneNote's clipboard `HTML Format` carries each picture as `<img src="data:image/png;base64,...">`, and
