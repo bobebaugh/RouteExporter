@@ -3,6 +3,8 @@
 For any assistant (Claude, Codex, others) and for Bob coming back after a break. Bob's current instruction wins.
 This repo is the project's memory: read this, [README.md](README.md), then the recent commits.
 [docs/AI-QUICKSTART.md](docs/AI-QUICKSTART.md) is the guide for operating the app (planning and saving rides).
+[docs/DESIGN.md](docs/DESIGN.md) holds the agreed design for what comes next (folders, accounts, lock-down
+hooks, OneNote import) and its build phases.
 
 ## Two kinds of work
 
@@ -57,16 +59,10 @@ routes, so expand the links and look at start/end before deciding how legs group
   served by a function). No Google Static Maps (key exposure, per-image cost, caching terms). Bob tests
   the paste in Gmail on the pilot.
 
-- Bulk import of Bob's past rides (planned, not started). The raw data is OneNote pages (a Tampa-area weekly
-  ride section and a WNC Riders section, about 75 pages), each with a dated title, notes, photos and
-  `maps.app.goo.gl` leg links. No assistant tool reads OneNote directly; the intended route is a OneNote
-  section export to Word (.docx keeps page titles and hyperlinks), parsed into recipes that Bob reviews
-  before `scripts/import-trip.mjs --create`.
-- Trip organization (needed before the bulk import). The Saved trips list is one flat list, which won't work
-  for 75+ rides. The app needs some folder or group structure, e.g. by region (Tampa weekly rides, WNC Riders,
-  trips like New England 2027), plus sorting by ride date. It is an app change: design it, build on the pilot,
-  and get Bob's approval before production. The group would belong in the trip's KML metadata and the listing
-  metadata in `server/trip-service.mjs` / `server/blob-storage.mjs`, so it survives export and import.
+- Folders, accounts, IP logging and the OneNote bulk import: designed, not started. See
+  [docs/DESIGN.md](docs/DESIGN.md) for decisions and phases. The raw ride data is OneNote pages (a
+  Tampa-area weekly section and a WNC Riders section, about 75 pages) with dated titles, notes, photos and
+  `maps.app.goo.gl` leg links; no assistant tool reads OneNote, so Bob exports sections to Word (.docx).
 
 - Google cost controls in [README.md](README.md#google-cost-controls-to-confirm-bob-2026-10-22): the
   routing function still has no same-origin check, and anyone who finds it can spend Routes calls.
