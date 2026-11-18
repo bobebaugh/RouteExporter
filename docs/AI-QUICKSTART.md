@@ -20,6 +20,7 @@ For Claude, ChatGPT, or another assistant helping a person plan and save rides. 
 | Available capability | Best approach |
 | --- | --- |
 | Interactive browser | Operate the app using its visible controls. This is the simplest complete workflow. |
+| Shell with Node and a checkout of this repository | Write a trip recipe and run `node scripts/import-trip.mjs <recipe.json>`, then add `--create`. It routes each leg through the site, saves a new trip and verifies it. See the repository's AGENTS.md. |
 | HTTP and file tools | Read saved trips using the storage API below; preserve KML and revisions. Use the browser for route creation or the repository's existing routing adapter. |
 | File tools only | Inspect or edit a supplied KML with the repository codec. Give the user the result to Import KML and Save As. |
 | Chat only | Prepare a table of ordered legs and Google Maps directions links. Give the user paste-and-save instructions. Do not claim to have operated the app. |

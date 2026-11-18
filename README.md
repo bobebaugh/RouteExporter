@@ -44,8 +44,9 @@ Checks cover KML fidelity, source links, third-party imports, malformed input, s
 ## Picking this up
 
 There is no running thread to return to: this repo is the project's memory. A new session (Claude, Codex or
-another assistant) starts by reading this README and [docs/AI-QUICKSTART.md](docs/AI-QUICKSTART.md), then the
-recent commits. On Bob's PC, PC Setup's `routeexporter` recipe prepares the checkout. The work through 2026-09-23
+another assistant) starts by reading [AGENTS.md](AGENTS.md) (how work happens here), this README and
+[docs/AI-QUICKSTART.md](docs/AI-QUICKSTART.md), then the recent commits. To add rides from Google Maps links
+without the browser, use `scripts/import-trip.mjs` (see AGENTS.md). On Bob's PC, PC Setup's `routeexporter` recipe prepares the checkout. The work through 2026-09-23
 was done by Codex (the `codex/pilot` branch and pilot site).
 
 ## Google cost controls to confirm (Bob, 2026-10-22)
