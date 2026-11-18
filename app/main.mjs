@@ -5,6 +5,8 @@ import {renderMapImage,emailParts} from './email.mjs';
 import {normalizeFolder,validDate,rideDateFromTitle,buildTree,folderPaths,searchTrips} from './organize.mjs';
 const $=id=>document.getElementById(id);
 const palette=['#f05a28','#1684e8','#a946d1','#d99b00','#00a884','#e34878'];
+// Suggested in Edit leg: the default palette plus strong colors that stand out on both map styles.
+const legColors=[...palette,'#d7263d','#0b3d91','#1b1b1b','#2e7d32'];
 const blank=()=>({title:'Untitled trip',notes:'',mapStyle:'standard',opacity:.5,folder:'',rideDate:'',segments:[]});
 const formatDate=iso=>{const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});};
 let savedRows=[];const openFolders=new Set();
@@ -54,7 +56,7 @@ function render(fit=false){
   card.querySelector('[data-up]').disabled=busy||i===0;card.querySelector('[data-down]').disabled=busy||i===trip.segments.length-1;
   card.addEventListener('click',e=>{if(e.target.closest('a,button'))return;selectLeg(i,false,true);});
   card.addEventListener('keydown',e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();selectLeg(i,false,true);}});
-  card.querySelector('[data-edit]').onclick=async()=>{if(busy)return;const value=await edit('Edit leg',s.title,s.note,true,s);if(!value||busy)return;if(value.sourceUrl!==s.sourceUrl||value.avoidHighways!==s.avoidHighways){if(!value.sourceUrl){status('Keep the existing link, or provide a Google Maps link to recalculate.');return;}await task(async()=>{status('Recalculating this leg with Google…');trip.segments[i]={...await buildLeg(value.sourceUrl,value.avoidHighways,value.name,s.color),note:value.notes};markDirty();render();status('Leg recalculated. Save to update the stored trip.');});}else{s.title=value.name;s.note=value.notes;markDirty();render();}};
+  card.querySelector('[data-edit]').onclick=async()=>{if(busy)return;const value=await edit('Edit leg',s.title,s.note,true,s);if(!value||busy)return;if(value.sourceUrl!==s.sourceUrl||value.avoidHighways!==s.avoidHighways){if(!value.sourceUrl){status('Keep the existing link, or provide a Google Maps link to recalculate.');return;}await task(async()=>{status('Recalculating this leg with Google…');trip.segments[i]={...await buildLeg(value.sourceUrl,value.avoidHighways,value.name,value.color),note:value.notes};markDirty();render();status('Leg recalculated. Save to update the stored trip.');});}else{s.title=value.name;s.note=value.notes;s.color=value.color;markDirty();render();}};
   card.querySelector('[data-remove]').onclick=async()=>{if(busy)return;if(!await confirmAction(`Remove ${s.title} from this trip?`))return;trip.segments.splice(i,1);selected=-1;markDirty();render();};
   const move=to=>{if(busy||to<0||to>=trip.segments.length)return;const [leg]=trip.segments.splice(i,1);trip.segments.splice(to,0,leg);selected=to;markDirty();render();};
   card.querySelector('[data-up]').onclick=()=>move(i-1);card.querySelector('[data-down]').onclick=()=>move(i+1);
@@ -80,6 +82,7 @@ function confirmAction(message){
 // place: {folder, rideDate} shows the trip-level Folder and Ride date fields (Save As, trip details).
 function edit(heading,name,notes,showNotes=true,leg=null,place=null){
  $('legFields').hidden=!leg;$('editSource').value=leg?.sourceUrl||'';$('editAvoid').checked=!!leg?.avoidHighways;
+ if(leg){$('editColor').value=String(leg.color).toLowerCase();$('colorSwatches').replaceChildren(...legColors.map(color=>{const b=document.createElement('button');b.type='button';b.className='swatch-choice';b.style.background=color;b.setAttribute('aria-label',`Use color ${color}`);b.onclick=()=>{$('editColor').value=color;};return b;}));}
  $('editHeading').textContent=heading;$('editName').value=name;$('editNotes').value=notes||'';$('notesLabel').hidden=!showNotes;
  $('tripFields').hidden=!place;
  // Until a date is chosen, the ride date follows a date written in the name ("2026 MAR 27 - …").
@@ -87,7 +90,7 @@ function edit(heading,name,notes,showNotes=true,leg=null,place=null){
  if(place){$('editFolder').value=place.folder||'';$('editRideDate').value=place.rideDate||rideDateFromTitle(name);refreshFolderOptions();}
  $('editName').oninput=()=>{if(dateFollowsName)$('editRideDate').value=rideDateFromTitle($('editName').value);};
  $('editRideDate').oninput=()=>{dateFollowsName=false;};
- return new Promise(resolve=>{const d=$('editDialog');let value=null;$('editForm').onsubmit=e=>{e.preventDefault();const name=$('editName').value.trim();if(!name){$('editName').focus();return;}value={name,notes:$('editNotes').value,...(leg?{sourceUrl:$('editSource').value.trim(),avoidHighways:$('editAvoid').checked}:{}),...(place?{folder:normalizeFolder($('editFolder').value),rideDate:validDate($('editRideDate').value)}:{})};d.close();};d.addEventListener('close',()=>resolve(value),{once:true});d.showModal();$('editName').focus();});
+ return new Promise(resolve=>{const d=$('editDialog');let value=null;$('editForm').onsubmit=e=>{e.preventDefault();const name=$('editName').value.trim();if(!name){$('editName').focus();return;}value={name,notes:$('editNotes').value,...(leg?{sourceUrl:$('editSource').value.trim(),avoidHighways:$('editAvoid').checked,color:$('editColor').value}:{}),...(place?{folder:normalizeFolder($('editFolder').value),rideDate:validDate($('editRideDate').value)}:{})};d.close();};d.addEventListener('close',()=>resolve(value),{once:true});d.showModal();$('editName').focus();});
 }
 function refreshFolderOptions(){
  const fill=()=>$('folderOptions').replaceChildren(...folderPaths(savedRows).map(path=>Object.assign(document.createElement('option'),{value:path})));
