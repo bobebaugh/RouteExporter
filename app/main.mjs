@@ -1,6 +1,7 @@
 import {storage} from './storage.mjs';
 import {toKml,fromKml,MAX_BYTES} from './kml.mjs';
 import {buildLeg,shortStopName,formatDuration,escapeXml} from './routing.mjs';
+import {renderMapImage,emailParts} from './email.mjs';
 const $=id=>document.getElementById(id);
 const palette=['#f05a28','#1684e8','#a946d1','#d99b00','#00a884','#e34878'];
 const blank=()=>({title:'Untitled trip',notes:'',mapStyle:'standard',opacity:.5,segments:[]});
@@ -20,7 +21,7 @@ function updateControls(){
  $('saveState').textContent=dirty?'Unsaved changes':saved?'Saved':'Not saved';
  document.title=`${dirty?'* ':''}${trip.title} — Route Exporter`;
  $('tripNotes').textContent=trip.notes;$('notesDetails').hidden=!trip.notes;
- for(const id of ['saveTrip','saveAsTrip','downloadTrip','fitTrip'])$(id).disabled=busy||!trip.segments.length;
+ for(const id of ['saveTrip','saveAsTrip','downloadTrip','fitTrip','emailTrip'])$(id).disabled=busy||!trip.segments.length;
  $('shareTrip').disabled=busy||!saved||dirty;
  $('deleteTrip').disabled=busy||!saved;
  for(const id of ['newTrip','openTrip','tripMenu','importTrip','addButton','urlInput','avoidHighways','routeOpacity'])$(id).disabled=busy;
@@ -99,6 +100,22 @@ $('tripMenu').onclick=()=>$('menuDialog').showModal();
 $('renameTrip').onclick=async()=>{$('menuDialog').close();const value=await edit('Rename trip / notes',trip.title,trip.notes);if(!value)return;trip.title=value.name;trip.notes=value.notes;markDirty();render();status('Name and notes updated locally. Save to update the shared trip.');};
 $('deleteTrip').onclick=async()=>{if(!saved||busy)return;if(!await confirmAction(`Delete “${trip.title}” from online storage? This affects everyone. Download KML first if you need a backup.`))return;$('menuDialog').close();task(async()=>{await storage.delete(saved.id,saved.revision);saved=null;dirty=true;history.replaceState(null,'','/');status('Online trip deleted. Your open copy remains available to download or Save As.');});};
 $('shareTrip').onclick=()=>task(async()=>{await navigator.clipboard.writeText(tripUrl());status('Trip link copied.');});
+// Copy for email. The clipboard write must start inside the click, so it gets promises that resolve once
+// the map is drawn (supported by current Chrome, Edge, Safari and Firefox). Older browsers fall back to
+// copying a hidden selection, which works only while the click still counts as recent.
+async function copyRich(parts){
+ if(window.ClipboardItem&&navigator.clipboard?.write){
+  try{await navigator.clipboard.write([new ClipboardItem({'text/html':parts.then(p=>new Blob([p.html],{type:'text/html'})),'text/plain':parts.then(p=>new Blob([p.text],{type:'text/plain'}))})]);return;}
+  catch(e){console.warn('Rich clipboard write failed; trying selection copy.',e);}
+ }
+ const {html}=await parts;const holder=document.createElement('div');holder.contentEditable='true';holder.style.cssText='position:fixed;left:-10000px;top:0;width:720px';holder.innerHTML=html;document.body.append(holder);
+ const range=document.createRange();range.selectNodeContents(holder);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);
+ const copied=document.execCommand('copy');selection.removeAllRanges();holder.remove();
+ if(!copied)throw new Error('The browser blocked copying. Click Copy for email again.');
+}
+$('emailTrip').onclick=()=>{if(busy||!trip.segments.length)return;const snapshot=structuredClone(trip);const link=saved&&!dirty?tripUrl():null;
+ const parts=renderMapImage(snapshot).then(image=>emailParts(snapshot,{image,link}));
+ task(async()=>{status('Drawing the map for email…');await copyRich(parts);status(link?'Copied for email. Paste into a Gmail draft.':'Copied for email (no trip link until it is saved). Paste into a Gmail draft.');});};
 $('downloadTrip').onclick=()=>{try{const url=URL.createObjectURL(new Blob([toKml(trip)],{type:'application/vnd.google-earth.kml+xml'}));const a=document.createElement('a');a.href=url;a.download=`${slug(trip.title)}.kml`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('KML downloaded with route lines, notes, and Google Maps links.');}catch(e){status(e.message);}};
 $('importTrip').onclick=async()=>{if(!busy&&await discard())$('fileInput').click();};
 $('fileInput').onchange=()=>{const file=$('fileInput').files[0];$('fileInput').value='';if(!file)return;task(async()=>{if(file.size>MAX_BYTES)throw new Error('KML must be smaller than 4 MB.');const next=fromKml(await file.text());adopt(next,null,true);history.replaceState(null,'','/');status('KML imported. Save As to add it to the online collection.');});};
