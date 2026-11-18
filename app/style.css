@@ -432,3 +432,13 @@ input[type="date"]{color-scheme:dark}
 .swatches{display:flex;gap:6px;flex-wrap:wrap}
 .swatch-choice{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);padding:0;cursor:pointer}
 .swatch-choice:hover,.swatch-choice:focus-visible{border-color:var(--bone)}
+/* Leg photo in Edit leg */
+.photo-field{margin:0 0 4px}
+.field-label{display:block;font-size:.85rem;margin-bottom:6px}
+.field-label small{color:var(--muted)}
+.photo-box{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px;border:1px dashed var(--line);border-radius:8px;min-height:56px}
+.photo-box:focus-visible,.photo-box.dragging{border-color:var(--bone);outline:0}
+#photoPreview{max-width:160px;max-height:110px;border-radius:4px}
+#photoHint{color:var(--muted);font-size:.8rem}
+.photo-buttons{display:flex;gap:6px;margin-left:auto}
+.photo-buttons button{border:1px solid var(--line);background:var(--panel-2);color:var(--bone);border-radius:6px;padding:6px 10px;font-size:.78rem}

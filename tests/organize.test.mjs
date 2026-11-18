@@ -89,3 +89,17 @@ test('the server lists folder, ride date and totals, and keeps the creation time
   const partial = await (await req('POST', null, { kml: toKml({ ...trip, segments: [...trip.segments, { ...trip.segments[0], distance: null }] }) })).json();
   assert.equal(partial.distanceMeters, null);
 });
+
+test('leg photos travel in the KML; unsafe or oversized ones are dropped; no photo leaves old KML unchanged', () => {
+  const photo = { src: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==', width: 1000, height: 750 };
+  const leg = { ...trip.segments[0], photo, photoCaption: '  Lunch  ' };
+  const back = fromKml(toKml({ ...trip, segments: [leg] }), DOMParser).segments[0];
+  assert.deepEqual(back.photo, photo);
+  assert.equal(back.photoCaption, 'Lunch');
+  for (const bad of [{ ...photo, src: 'data:image/svg+xml;base64,PHN2Zz4=' }, { ...photo, src: 'javascript:alert(1)' },
+    { ...photo, width: 0 }, { ...photo, src: `data:image/jpeg;base64,${'A'.repeat(700000)}` }, 'not an object']) {
+    assert.equal(fromKml(toKml({ ...trip, segments: [{ ...leg, photo: bad }] }), DOMParser).segments[0].photo, null);
+  }
+  const plain = toKml(trip);
+  assert.ok(!plain.includes('photo'));
+});

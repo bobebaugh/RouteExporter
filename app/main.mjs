@@ -3,6 +3,7 @@ import {toKml,fromKml,MAX_BYTES} from './kml.mjs';
 import {buildLeg,shortStopName,formatDuration,escapeXml} from './routing.mjs';
 import {renderMapImage,emailParts} from './email.mjs';
 import {normalizeFolder,validDate,rideDateFromTitle,buildTree,folderPaths,searchTrips} from './organize.mjs';
+import {shrinkPhoto,pictureFrom} from './photo.mjs';
 const $=id=>document.getElementById(id);
 const palette=['#f05a28','#1684e8','#a946d1','#d99b00','#00a884','#e34878'];
 // Suggested in Edit leg: the default palette plus strong colors that stand out on both map styles.
@@ -56,7 +57,7 @@ function render(fit=false){
   card.querySelector('[data-up]').disabled=busy||i===0;card.querySelector('[data-down]').disabled=busy||i===trip.segments.length-1;
   card.addEventListener('click',e=>{if(e.target.closest('a,button'))return;selectLeg(i,false,true);});
   card.addEventListener('keydown',e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();selectLeg(i,false,true);}});
-  card.querySelector('[data-edit]').onclick=async()=>{if(busy)return;const value=await edit('Edit leg',s.title,s.note,true,s);if(!value||busy)return;if(value.sourceUrl!==s.sourceUrl||value.avoidHighways!==s.avoidHighways){if(!value.sourceUrl){status('Keep the existing link, or provide a Google Maps link to recalculate.');return;}await task(async()=>{status('Recalculating this leg with Google…');trip.segments[i]={...await buildLeg(value.sourceUrl,value.avoidHighways,value.name,value.color),note:value.notes};markDirty();render();status('Leg recalculated. Save to update the stored trip.');});}else{s.title=value.name;s.note=value.notes;s.color=value.color;markDirty();render();}};
+  card.querySelector('[data-edit]').onclick=async()=>{if(busy)return;const value=await edit('Edit leg',s.title,s.note,true,s);if(!value||busy)return;if(value.sourceUrl!==s.sourceUrl||value.avoidHighways!==s.avoidHighways){if(!value.sourceUrl){status('Keep the existing link, or provide a Google Maps link to recalculate.');return;}await task(async()=>{status('Recalculating this leg with Google…');trip.segments[i]={...await buildLeg(value.sourceUrl,value.avoidHighways,value.name,value.color),note:value.notes,photo:value.photo,photoCaption:value.photoCaption};markDirty();render();status('Leg recalculated. Save to update the stored trip.');});}else{Object.assign(s,{title:value.name,note:value.notes,color:value.color,photo:value.photo,photoCaption:value.photoCaption});markDirty();render();}};
   card.querySelector('[data-remove]').onclick=async()=>{if(busy)return;if(!await confirmAction(`Remove ${s.title} from this trip?`))return;trip.segments.splice(i,1);selected=-1;markDirty();render();};
   const move=to=>{if(busy||to<0||to>=trip.segments.length)return;const [leg]=trip.segments.splice(i,1);trip.segments.splice(to,0,leg);selected=to;markDirty();render();};
   card.querySelector('[data-up]').onclick=()=>move(i-1);card.querySelector('[data-down]').onclick=()=>move(i+1);
@@ -82,6 +83,7 @@ function confirmAction(message){
 // place: {folder, rideDate} shows the trip-level Folder and Ride date fields (Save As, trip details).
 function edit(heading,name,notes,showNotes=true,leg=null,place=null){
  $('legFields').hidden=!leg;$('editSource').value=leg?.sourceUrl||'';$('editAvoid').checked=!!leg?.avoidHighways;
+ if(leg){editPhoto=leg.photo||null;showPhoto();$('editCaption').value=leg.photoCaption||'';}
  if(leg){$('editColor').value=String(leg.color).toLowerCase();$('colorSwatches').replaceChildren(...legColors.map(color=>{const b=document.createElement('button');b.type='button';b.className='swatch-choice';b.style.background=color;b.setAttribute('aria-label',`Use color ${color}`);b.onclick=()=>{$('editColor').value=color;};return b;}));}
  $('editHeading').textContent=heading;$('editName').value=name;$('editNotes').value=notes||'';$('notesLabel').hidden=!showNotes;
  $('tripFields').hidden=!place;
@@ -90,8 +92,21 @@ function edit(heading,name,notes,showNotes=true,leg=null,place=null){
  if(place){$('editFolder').value=place.folder||'';$('editRideDate').value=place.rideDate||rideDateFromTitle(name);refreshFolderOptions();}
  $('editName').oninput=()=>{if(dateFollowsName)$('editRideDate').value=rideDateFromTitle($('editName').value);};
  $('editRideDate').oninput=()=>{dateFollowsName=false;};
- return new Promise(resolve=>{const d=$('editDialog');let value=null;$('editForm').onsubmit=e=>{e.preventDefault();const name=$('editName').value.trim();if(!name){$('editName').focus();return;}value={name,notes:$('editNotes').value,...(leg?{sourceUrl:$('editSource').value.trim(),avoidHighways:$('editAvoid').checked,color:$('editColor').value}:{}),...(place?{folder:normalizeFolder($('editFolder').value),rideDate:validDate($('editRideDate').value)}:{})};d.close();};d.addEventListener('close',()=>resolve(value),{once:true});d.showModal();$('editName').focus();});
+ return new Promise(resolve=>{const d=$('editDialog');let value=null;$('editForm').onsubmit=e=>{e.preventDefault();const name=$('editName').value.trim();if(!name){$('editName').focus();return;}value={name,notes:$('editNotes').value,...(leg?{sourceUrl:$('editSource').value.trim(),avoidHighways:$('editAvoid').checked,color:$('editColor').value,photo:editPhoto,photoCaption:$('editCaption').value.trim()}:{}),...(place?{folder:normalizeFolder($('editFolder').value),rideDate:validDate($('editRideDate').value)}:{})};d.close();};d.addEventListener('close',()=>resolve(value),{once:true});d.showModal();$('editName').focus();});
 }
+// Leg photo in Edit leg: paste (Ctrl+V anywhere in the dialog), drop, or choose a file; shrunk in the browser.
+let editPhoto=null;
+const photoHint='Paste a picture (Ctrl+V) or drop one here';
+function showPhoto(message=''){$('photoPreview').hidden=!editPhoto;$('photoPreview').src=editPhoto?.src||'';$('photoHint').textContent=message||photoHint;$('photoHint').hidden=!!editPhoto&&!message;$('photoRemove').hidden=!editPhoto;}
+async function takePhoto(file){if(!file)return;showPhoto('Shrinking picture…');
+ try{editPhoto=await shrinkPhoto(file);showPhoto();}catch(e){showPhoto(e.message);}}
+$('editDialog').addEventListener('paste',e=>{if($('legFields').hidden)return;const file=pictureFrom(e.clipboardData);if(!file)return;e.preventDefault();takePhoto(file);});
+$('photoBox').addEventListener('dragover',e=>{e.preventDefault();$('photoBox').classList.add('dragging');});
+$('photoBox').addEventListener('dragleave',()=>$('photoBox').classList.remove('dragging'));
+$('photoBox').addEventListener('drop',e=>{e.preventDefault();$('photoBox').classList.remove('dragging');takePhoto(pictureFrom(e.dataTransfer));});
+$('photoChoose').onclick=()=>$('photoFile').click();
+$('photoFile').onchange=()=>{const file=$('photoFile').files[0];$('photoFile').value='';takePhoto(file);};
+$('photoRemove').onclick=()=>{editPhoto=null;showPhoto();};
 function refreshFolderOptions(){
  const fill=()=>$('folderOptions').replaceChildren(...folderPaths(savedRows).map(path=>Object.assign(document.createElement('option'),{value:path})));
  fill();if(!savedRows.length)storage.list().then(({trips})=>{savedRows=trips;fill();}).catch(()=>{});

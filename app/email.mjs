@@ -114,6 +114,9 @@ export function emailParts(trip, { image = null, link = null } = {}) {
     return { ends, size, stops: s.stops.slice(1, -1).map(p => shortStopName(p.name)) };
   };
 
+  // Leg photos go at the end, each headed "Leg 2 - Smoke On The River - caption".
+  const photos = legs.filter(s => s.photo?.src);
+  const photoTitle = s => [s.title, s.endName && shortStopName(s.endName), s.photoCaption].filter(Boolean).join(' - ');
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#202124">',
     `<p style="margin:0 0 4px;font-size:20px;font-weight:bold">${esc(trip.title)}</p>`,
@@ -130,6 +133,11 @@ export function emailParts(trip, { image = null, link = null } = {}) {
         + '</p>';
     }),
     link ? `<p style="margin:12px 0 0">Whole ride in Route Exporter: <a href="${esc(link)}">${esc(trip.title)}</a></p>` : '',
+    ...photos.map(s => {
+      const width = Math.min(600, s.photo.width), height = Math.round(s.photo.height * width / s.photo.width);
+      return `<p style="margin:18px 0 6px;font-weight:bold">${esc(photoTitle(s))}</p>`
+        + `<p style="margin:0"><img src="${s.photo.src}" width="${width}" height="${height}" alt="${esc(photoTitle(s))}" style="max-width:100%;height:auto"></p>`;
+    }),
     '</div>',
   ].join('');
 
@@ -141,6 +149,7 @@ export function emailParts(trip, { image = null, link = null } = {}) {
       stops.length ? `Stops: ${stops.join(', ')}` : null, s.sourceUrl ? `Google Maps: ${s.sourceUrl}` : null);
   }
   if (link) lines.push('', `Whole ride in Route Exporter: ${link}`);
+  if (photos.length) lines.push('', ...photos.map(s => `Photo: ${photoTitle(s)}`));
   const text = lines.filter(line => line !== null).join('\n');
 
   return { html, text };

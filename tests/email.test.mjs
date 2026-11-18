@@ -54,3 +54,16 @@ test('the map view fits every point inside the image', () => {
   }
   assert.ok(fitView([[27.8, -82.7], [42.9, -71.0]]).z < view.z, 'a longer trip zooms out');
 });
+
+test('leg photos go at the end, headed with leg, destination and caption; none when absent', () => {
+  const photo = { src: 'data:image/jpeg;base64,BBBB', width: 1000, height: 750 };
+  const withPhotos = { ...trip, segments: [{ ...trip.segments[0], photo, photoCaption: 'Brisket & beans' }, { ...trip.segments[1], photo: { ...photo, width: 400, height: 300 } }] };
+  const { html, text } = emailParts(withPhotos, { image, link: 'https://rideplan.ebaugh.net/?trip=t1' });
+  assert.ok(html.includes('Leg 1 - Lunch Spot - Brisket &amp; beans</p>'));
+  assert.ok(html.includes('Leg 2 - Home</p>'), 'no caption, no trailing dash');
+  assert.ok(html.includes('<img src="data:image/jpeg;base64,BBBB" width="600" height="450"'), 'wide photos display at 600 px');
+  assert.ok(html.includes('width="400" height="300"'), 'small photos keep their size');
+  assert.ok(html.indexOf('BBBB') > html.indexOf('Whole ride in Route Exporter'), 'photos come after everything else');
+  assert.ok(text.endsWith('Photo: Leg 1 - Lunch Spot - Brisket & beans\nPhoto: Leg 2 - Home'));
+  assert.ok(!emailParts(trip, { image }).html.includes('base64,BBBB'));
+});

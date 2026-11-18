@@ -17,6 +17,11 @@ const coord = p => Array.isArray(p) && p.length >= 2 && p.every(Number.isFinite)
 export const safeLink = value => {
  try { const u=new URL(value); return u.protocol==='https:' && ['google.com','www.google.com','maps.google.com','goo.gl','maps.app.goo.gl'].includes(u.hostname) ? u.href : ''; } catch { return ''; }
 };
+// A leg's optional photo: a shrunk raster image carried as a data: URI (no SVG, which can hold script).
+export const MAX_PHOTO_CHARS = 700000;
+const validPhoto = p => p && typeof p.src === 'string' && p.src.length <= MAX_PHOTO_CHARS
+ && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(p.src)
+ && [p.width, p.height].every(n => Number.isInteger(n) && n > 0 && n <= 4000) ? {src:p.src,width:p.width,height:p.height} : null;
 export function validateTrip(trip) {
  if (!trip || typeof trip.title!=='string' || !trip.title.trim() || trip.title.length>120 || !Array.isArray(trip.segments) || trip.segments.length>100) throw new Error('Invalid trip name or leg count (maximum 100).');
  let count=0;
@@ -25,7 +30,7 @@ export function validateTrip(trip) {
   count+=s.points.length;
   const stops=Array.isArray(s.stops)?s.stops:[];
   if (stops.length>2000 || stops.some(p=>!coord([p.lat,p.lon]) || typeof p.name!=='string')) throw new Error('Invalid waypoints.');
-  return {title:String(s.title||`Leg ${i+1}`).slice(0,120),note:String(s.note||'').slice(0,3000),color:/^#[a-f\d]{6}$/i.test(s.color)?s.color:'#f05a28',sourceUrl:safeLink(s.sourceUrl),avoidHighways:s.avoidHighways===true,points:s.points,stops:stops.map(p=>({lat:p.lat,lon:p.lon,name:p.name.slice(0,1000)})),distance:Number.isFinite(s.distance)&&s.distance>=0?s.distance:null,duration:Number.isFinite(s.duration)&&s.duration>=0?s.duration:null,startName:String(s.startName||stops[0]?.name||'').slice(0,1000),endName:String(s.endName||stops.at(-1)?.name||'').slice(0,1000),shapingPointCount:Number.isInteger(s.shapingPointCount)&&s.shapingPointCount>=0?s.shapingPointCount:0};
+  return {title:String(s.title||`Leg ${i+1}`).slice(0,120),note:String(s.note||'').slice(0,3000),color:/^#[a-f\d]{6}$/i.test(s.color)?s.color:'#f05a28',sourceUrl:safeLink(s.sourceUrl),avoidHighways:s.avoidHighways===true,points:s.points,stops:stops.map(p=>({lat:p.lat,lon:p.lon,name:p.name.slice(0,1000)})),distance:Number.isFinite(s.distance)&&s.distance>=0?s.distance:null,duration:Number.isFinite(s.duration)&&s.duration>=0?s.duration:null,startName:String(s.startName||stops[0]?.name||'').slice(0,1000),endName:String(s.endName||stops.at(-1)?.name||'').slice(0,1000),shapingPointCount:Number.isInteger(s.shapingPointCount)&&s.shapingPointCount>=0?s.shapingPointCount:0,photo:validPhoto(s.photo),photoCaption:String(s.photoCaption||'').trim().slice(0,200)};
  });
  if(count>250000) throw new Error('Trip has too many coordinates.');
  return {title:trip.title.trim(),notes:String(trip.notes||'').slice(0,3000),mapStyle:trip.mapStyle==='terrain'?'terrain':'standard',opacity:Number.isFinite(trip.opacity)?Math.max(.15,Math.min(.9,trip.opacity)):.5,folder:normalizeFolder(trip.folder),rideDate:validDate(trip.rideDate),segments};
@@ -38,6 +43,8 @@ export function toKml(input) {
  if(!meta.rideDate)delete meta.rideDate;
  const folders=segments.map(s=>{
   const {points,...leg}=s;
+  if(!leg.photo)delete leg.photo;
+  if(!leg.photoCaption)delete leg.photoCaption;
   const rgb=s.color.slice(1);const color=`80${rgb.slice(4)}${rgb.slice(2,4)}${rgb.slice(0,2)}`;
   return `<Folder><name>${esc(s.title)}</name>${extra('routeExporterLeg',leg)}<Placemark><name>${esc(s.title)}</name><description>${esc(s.note)}</description><Style><LineStyle><color>${color}</color><width>6</width></LineStyle></Style><LineString><tessellate>1</tessellate><coordinates>${points.map(p=>`${p[1]},${p[0]},${p[2]??0}`).join(' ')}</coordinates></LineString></Placemark>${s.stops.map(p=>`<Placemark><name>${esc(p.name.split(',')[0])}</name><description>${esc(p.name)}</description><Point><coordinates>${p.lon},${p.lat},0</coordinates></Point></Placemark>`).join('')}</Folder>`;
  }).join('');
