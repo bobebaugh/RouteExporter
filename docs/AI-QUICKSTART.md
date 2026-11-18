@@ -1,6 +1,8 @@
 # Route Exporter AI cheat sheet
 
-For Claude, ChatGPT, or another assistant helping a person plan and save rides. This is an app operating guide, not permission to change someone else's trips. Follow the user's instructions and your own tool policies. Verified against the September 23, 2026 production release.
+For Claude, ChatGPT, or another assistant helping a person plan and save rides. This is an app operating guide, not permission to change someone else's trips. Follow the user's instructions and your own tool policies. Verified against the September 23, 2026 production release; items marked *(pilot)* were added on 2026-11-18 and exist only on the pilot site until the owner's next production release.
+
+**Pilot vs production (2026-11-18):** the pilot (`codex-pilot--routeexporter.netlify.app`) additionally has folders and ride dates, **Copy for email**, a route color per leg, and an optional photo with caption per leg. Its trips are a separate collection: a production trip must be downloaded as KML and imported on the pilot to use these there.
 
 **App:** https://rideplan.ebaugh.net  
 **Human guide:** [Route Exporter User Guide](Route-Exporter-User-Guide.docx)  
@@ -34,7 +36,7 @@ Browser access varies by assistant and account. Do not assume you can control th
 3. Prepare a working table: `Day | Start | Ordered stops | Finish | Maps link | Notes`. Check that each day's finish connects to the next day's start unless a transfer is intentional.
 4. For each day or loop, prepare a Google Maps **driving directions** link. An ordinary place pin or map viewport is not a route. Use intermediate towns or actual stops to express intended corridors; do not assume “scenic route” determines a particular road.
 5. Add each route to the app, then inspect the calculated line, endpoints, distance, and time. The routing API can choose a different path from the route displayed in Google Maps. Never guarantee that a shared URL reproduces a manually dragged route exactly.
-6. Label legs consistently, such as **Day 1**, and put assumptions, highlights, overnight information, and unresolved choices in Notes. Trip menu → Name, folder, date, notes holds overall trip notes.
+6. Label legs consistently, such as **Day 1**, and put assumptions, highlights, overnight information, and unresolved choices in Notes. Trip menu → Rename / notes (on the pilot: Name, folder, date, notes) holds overall trip notes.
 7. Flag implausibly long days. Driving time excludes breaks and overnight stops. Imported unknown distances and times are excluded from totals; do not interpret those totals as complete.
 
 Example directions URL structure (URL-encode each location and preserve waypoint order):
@@ -55,7 +57,7 @@ Use fresh page observations and accessible labels rather than fixed screen coord
 2. Fill **Google Maps directions link** and set **Avoid highways** explicitly for this route. Click **Add route** once.
 3. Wait for the new leg card and route line. Inspect them, then use that card's **Edit** button to set its Name and Notes. Click **Continue**.
 4. Repeat in the intended order. The arrows or drag-and-drop reorder cards; they do **not** renumber titles automatically.
-5. Click **Save As**, enter the trip Name, Folder (pick an existing one or type a path such as `Tampa Weekly/2026`; blank = not in a folder), Ride date (filled in from a date in the name) and Notes, and **Continue**. Wait for **Saved**.
+5. Click **Save As**, enter the trip Name, *(pilot)* Folder (pick an existing one or type a path such as `Tampa Weekly/2026`; blank = not in a folder), Ride date (filled in from a date in the name) and Notes, and **Continue**. Wait for **Saved**.
 6. Click **Copy Link** and capture the clipboard text with your supported tools. Download the KML to a real file and make it available to the user.
 7. Reopen the copied link and verify the saved result. Report any assumptions or legs still needing review.
 
@@ -64,10 +66,11 @@ Use fresh page observations and accessible labels rather than fixed screen coord
 - **Open** shows the shared list; use the row-specific Open button, not the toolbar button again. **Refresh** updates the list.
 - Before making a variant, use **Save As** to create your own named copy. Similar names do not mean the same trip; retain the stable ID from the URL.
 - In **Edit leg**, changing Name or Notes keeps the existing geometry. Changing the Google Maps link or Avoid highways recalculates that leg with Google.
+- *(pilot)* **Edit leg** also has **Route color** (a picker plus suggested colors; pick one that stands out on the map) and an optional **Photo** with **Photo caption**, usually the leg's destination such as the lunch stop. Paste a picture with Ctrl+V anywhere in the dialog, drop an image file on the photo box, or use **Choose file**; **Remove** clears it. The browser shrinks it to about 1000 px (JPEG) before storing. Color, photo and caption changes keep the geometry and make no Google call. The photo appears only in Edit leg and in Copy for email.
 - The checkbox above the map affects newly added routes; it does not change all saved legs.
 - **Save** on an existing trip asks to replace its shared version. Confirm only when that update is within the user's request.
-- **Trip menu → Name, folder, date, notes** changes the open copy, including moving it to another folder. Follow with Save. The trip keeps its link.
-- **Saved trips** groups trips into folders, newest ride first, with a search box for names and folders.
+- **Trip menu → Rename / notes** (*(pilot)* **Name, folder, date, notes**) changes the open copy, including *(pilot)* moving it to another folder. Follow with Save. The trip keeps its link.
+- *(pilot)* **Saved trips** groups trips into folders, newest ride first, with a search box for names and folders.
 - **Remove** removes one leg from the open copy. Save commits the removal online.
 
 ### Inspect the map
@@ -78,6 +81,10 @@ Use fresh page observations and accessible labels rather than fixed screen coord
 - **Route opacity** ranges from 15% to 90%; lower values expose road labels. The selected route is emphasized.
 - **Standard / Terrain** changes the background. Map style and opacity are saved with the trip.
 - **Open in Google Maps** opens the leg's original URL. **Copy Link** shares the entire saved trip in Route Exporter.
+
+### Share a ride by email *(pilot)*
+
+**Copy for email** (below Copy Link) copies the open trip, including unsaved edits, as formatted text with one map image of all legs. Paste it into an email draft (tested in Gmail): title, notes, totals, the map, then per leg its color mark, start → end, miles, time, intermediate stops and a clickable Google Maps link, then a link to the whole ride when the trip is saved without pending edits, then each leg photo headed `Leg 2 - <destination> - <caption>`. The map is drawn in the browser from the same map tiles (no Google call). Clipboard access needs a real click in a current browser; an automation tool that cannot read the clipboard should tell the user to click the button and paste.
 
 ## Backup and recovery
 
@@ -95,7 +102,7 @@ Base endpoint: `https://rideplan.ebaugh.net/.netlify/functions/trips`
 
 | Method | Request | Result |
 | --- | --- | --- |
-| GET | Base endpoint | `{ "trips": [{ "id", "title", "updatedAt", "legCount", "revision" }] }` |
+| GET | Base endpoint | `{ "trips": [{ "id", "title", "updatedAt", "legCount", "revision" }] }`; *(pilot)* rows saved since 2026-11-18 also carry `createdAt`, `folder`, `rideDate`, `distanceMeters`, `durationSeconds` (absent on older rows until their next save) |
 | GET | `?id=<URL-encoded-id>` | Record including `id`, raw `kml`, metadata, and `revision` |
 | POST | JSON `{ "kml": "<complete KML>" }` | Creates a new trip; returns metadata, generated `id`, and `revision`; HTTP 201 |
 | PUT | `?id=...`, JSON `{ "kml": "<complete KML>", "revision": "<last-read revision>" }` | Updates that trip conditionally; HTTP 200 |
@@ -122,6 +129,8 @@ Use the repository's `app/kml.mjs` codec instead of reconstructing its extended 
 - Document ExtendedData `routeExporter` is JSON with format version 1 and trip metadata. Each leg Folder has `routeExporterLeg` JSON and one LineString.
 - Preserve every route coordinate, original `sourceUrl`, ordered stops, names, notes, colors, highway flags, distances, durations, and map settings. Do not simplify geometry unless requested.
 - Distances use meters; durations use seconds. Unknown values are `null`, not zero.
+- *(pilot)* Optional fields, left out of the KML when empty so older files stay byte-identical: trip `folder` (path such as `Tampa Weekly/2026`, ≤200 characters, normalized) and `rideDate` (`YYYY-MM-DD`; `app/organize.mjs` `rideDateFromTitle` reads dates from titles like `2026 MAR 27 - …` or `7/05/2025 -- …`); leg `photo` (`{ src, width, height }`, `src` a `data:image/jpeg|png|webp;base64,` URI of at most 700,000 characters; SVG and anything else are dropped) and `photoCaption` (≤200 characters). Photos count toward the 4 MiB limit, so keep them shrunk (about 1000 px, JPEG).
+- Trip recipes for `scripts/import-trip.mjs` may include `folder` and `rideDate` (default: a date found in the title).
 - Own-format KML round-trips metadata and geometry. Generic KML imports LineStrings and Points, but does not recover absent Maps URLs or times. Generic point markers are attached to the first imported leg; inspect multi-leg imports.
 - Limits: 4 MiB KML, 100 legs, 250,000 route coordinates, and 2,000 stops per leg. Use uncompressed `.kml`. DTD/entity declarations are rejected; NetworkLinks are not fetched.
 - Opening, importing, exporting, saving, or renaming stored geometry makes no Google routing call. Adding routes or changing routing inputs does. Map tiles still require network access; a KML backup is not an offline basemap.

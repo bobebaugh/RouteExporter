@@ -30,6 +30,10 @@ Opening, saving, renaming, downloading, importing, and sharing stored trips do n
 - `server/access.mjs`: intentionally open authorization hook; future invite policy belongs here.
 - `app/routing.mjs` and `netlify/functions/route.js`: Google routing integration.
 - `app/main.mjs`: editor, trip browser, map interactions.
+- `app/organize.mjs`: folder paths, ride dates (including dates read from titles), the Saved trips tree and search; pure functions.
+- `app/email.mjs`: Copy for email, which draws one map of the whole trip on a canvas from the map tiles and builds the email HTML/text.
+- `app/photo.mjs`: shrinks a pasted, dropped or chosen leg photo in the browser.
+- `scripts/import-trip.mjs`: creates a trip from Google Maps links without the browser (see AGENTS.md).
 
 The storage adapter returns a revision token. Updates use conditional writes, so stale clients cannot silently replace a newer version. Deletion writes an empty conditional tombstone (not retained trip content) to prevent races with saves. Saved trip contents are raw KML, not a database JSON record; lightweight metadata supports listing without downloading all geometry.
 

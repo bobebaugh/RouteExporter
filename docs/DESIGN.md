@@ -40,6 +40,7 @@ pilot first and promoted to production in Bob's batches (production deploys use 
 |---|---|
 | `folder` | Path within its space or Unfiled, `/`-separated, ≤200 chars, empty = top of the space |
 | `rideDate` | `YYYY-MM-DD` or empty; drives sorting. The OneNote import derives it from page titles |
+| leg `photo`, `photoCaption` | Built separately on 2026-11-18: one optional shrunk photo per leg (data URI) and caption, used by Copy for email. The OneNote import could carry each page's destination photo here |
 
 **Server-held trip metadata (Blobs metadata, returned by the public list, so never IPs or emails):**
 `title`, `legCount`, `distanceMeters`, `durationSeconds` (for the list without opening trips), `folder` and

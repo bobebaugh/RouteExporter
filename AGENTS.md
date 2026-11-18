@@ -12,7 +12,8 @@ hooks, OneNote import) and its build phases.
 
 1. Bob does it in the app at https://rideplan.ebaugh.net.
 2. With a shell and this checkout: put the trip in a recipe file (the version-2 format of
-   `trips/new-england-2027.json`: title, notes, and one segment per leg with `title` and `sourceUrl`)
+   `trips/new-england-2027.json`: title, notes, optional `folder`/`rideDate`, and one segment per leg
+   with `title` and `sourceUrl`; photos are added in the app)
    and run `node scripts/import-trip.mjs <recipe.json>` to route and check it, then again with
    `--create` to save it as a new trip. The script uses the app's own `app/routing.mjs` and
    `app/kml.mjs`, refuses a duplicate title, and reads the trip back to verify it.
@@ -44,23 +45,27 @@ routes, so expand the links and look at start/end before deciding how legs group
 
 ## Open items
 
-- "Copy for email": built in `app/email.mjs`, on the pilot since 2026-11-18. Bob's Gmail paste test
-  passed (map and clickable links came through). Waiting for the next batched promotion to production;
-  minor polish later: some waypoint labels crowd each other. One click copies the shown trip, and one
-  paste into a Gmail draft gives the map image plus title, notes, legs (distance, time, start/end, stops,
-  Google Maps links) and the trip link. Evidence (2026-11-18): Bob's OneNote copy → Gmail paste works.
-  OneNote's clipboard `HTML Format` carries each picture as `<img src="data:image/png;base64,...">`, and
-  Gmail turns those into inline (`cid:`) images in the draft, so no hosting is needed. Plan: render the
-  route on a canvas from the same OSM/OpenTopoMap tiles (both send `Access-Control-Allow-Origin: *`, so
-  the canvas can be exported), draw the legs in their colors with tile attribution, then write a
-  `ClipboardItem` with `text/html` (data-URI `<img>` + details) and `text/plain`. Works for unsaved trips.
-  Unproven part: whether the browser's clipboard write keeps the data-URI image as OneNote's does; if
-  not, fall back to `execCommand('copy')` on a hidden selection, then to a hosted image (PNG in Blobs
-  served by a function). No Google Static Maps (key exposure, per-image cost, caching terms). Bob tests
-  the paste in Gmail on the pilot.
+- **On the pilot, not yet in production** (all 2026-11-18; waiting for Bob's checks and his next batched
+  promotion, which needs his OK):
+  - Copy for email (`app/email.mjs`): one map of all legs drawn on a canvas from the OSM/OpenTopoMap tiles
+    (both allow cross-origin use), copied as `text/html` with the image as a `data:` URI plus `text/plain`.
+    Bob's Gmail paste test passed. Why data URIs: his OneNote clipboard carries pictures that way and Gmail
+    turns them into inline images, so no hosting is needed. No Google Static Maps (key exposure, cost,
+    caching terms). Polish later: some waypoint labels crowd each other.
+  - Folders and ride dates (design phase 1; `app/organize.mjs`): folder tree, search, ride-date sorting,
+    Folder and Ride date fields; list metadata gains `createdAt`, `folder`, `rideDate`, totals.
+  - Route color per leg in Edit leg (picker plus suggested colors).
+  - Optional photo and caption per leg (`app/photo.mjs`): paste/drop/choose in Edit leg, shrunk in the
+    browser to ~1000 px JPEG, stored in the leg inside the KML (so in Blobs with the trip), shown only at
+    the end of Copy for email as `Leg N - <destination> - <caption>`. Showing photos in the app itself is
+    undecided (screen space); a camera mark on leg cards was suggested. Bob's own snips come from Street
+    View and Google place photos via Snipaste; Google's terms limit keeping those on a public site, which
+    he has been told.
+  - Every addition leaves older trips' KML byte-identical when the new fields are empty; keep it that way
+    (check with a `toKml(fromKml(stored)) === stored` loop over both sites' trips after codec changes).
 
 - Folders, accounts, IP logging and the OneNote bulk import: designed; phase 1 (folders and ride dates,
-  no accounts) is on the pilot awaiting Bob's check and the next batched promotion. See
+  no accounts) is on the pilot, above. See
   [docs/DESIGN.md](docs/DESIGN.md) for decisions and phases. The raw ride data is OneNote pages (a
   Tampa-area weekly section and a WNC Riders section, about 75 pages) with dated titles, notes, photos and
   `maps.app.goo.gl` leg links; no assistant tool reads OneNote, so Bob exports sections to Word (.docx).
