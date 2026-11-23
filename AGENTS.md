@@ -43,10 +43,17 @@ routes, so expand the links and look at start/end before deciding how legs group
   shouldn't be changed: Claude uses `git -c user.name=Claude -c user.email=noreply@anthropic.com commit`
   plus its `Co-Authored-By` trailer; Codex uses `codex@openai.com`. Fetch before pushing; never force-push.
 
+## Site pages other projects rely on
+
+- `privacy.html` and `terms.html` (added 2026-11-23) are the privacy policy and terms links for Bob's Google
+  OAuth app in the Google Cloud project "rclone" (his home camera recordings to his own Drive; see the
+  private pc-setup repo). That app lists `ebaugh.net` as its authorized domain. Keep both pages at these
+  paths; Google requires them for the app to stay published.
+
 ## Open items
 
-- **On the pilot, not yet in production** (all 2026-11-18; waiting for Bob's checks and his next batched
-  promotion, which needs his OK):
+- **Promoted to production 2026-11-23** at Bob's request (the whole pilot, with the pages above). Built
+  on the pilot 2026-11-18; notes kept for follow-up:
   - Copy for email (`app/email.mjs`): one map of all legs drawn on a canvas from the OSM/OpenTopoMap tiles
     (both allow cross-origin use), copied as `text/html` with the image as a `data:` URI plus `text/plain`.
     Bob's Gmail paste test passed. Why data URIs: his OneNote clipboard carries pictures that way and Gmail
