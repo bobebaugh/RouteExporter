@@ -45,10 +45,19 @@ routes, so expand the links and look at start/end before deciding how legs group
 
 ## Site pages other projects rely on
 
-- `privacy.html` and `terms.html` (added 2026-11-23) are the privacy policy and terms links for Bob's Google
-  OAuth app in the Google Cloud project "rclone" (his home camera recordings to his own Drive; see the
-  private pc-setup repo). That app lists `ebaugh.net` as its authorized domain. Keep both pages at these
-  paths; Google requires them for the app to stay published.
+- `privacy.html` and `terms.html` (added 2026-11-23, with Bob) are the privacy policy and terms links for
+  Bob's Google OAuth app in the Google Cloud project "rclone" (his home camera recordings to his own Drive;
+  see the private pc-setup repo). That app lists `ebaugh.net` as its authorized domain and
+  `https://rideplan.ebaugh.net` as its home page. Keep both pages at these paths; Google requires them for
+  the app to stay published.
+- Why here: an OAuth app that reads and writes a personal Google account's Drive must be published, or
+  Google expires its sign-ins every 7 days ("Testing" status), which meant a weekly re-sign-in. The
+  console won't publish without home page, privacy and terms links on a domain Bob controls. Sign-in-only
+  apps (name/email, as Firebase sites use) are exempt, which is why Bob's other apps never needed this.
+  Bob already owns `ebaugh.net` and this site is static on Netlify, so two plain pages were the smallest
+  fix. They are generic (household apps; data stays in the person's own Google account) because this
+  repo is public. No app logo was uploaded: a logo triggers Google's brand verification.
+- The same push promoted the whole pilot to production at Bob's request (one deploy).
 
 ## Open items
 
